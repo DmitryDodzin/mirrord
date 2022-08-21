@@ -4,8 +4,7 @@ use mirrord_preview::{connect, ProxiedRequest, ProxiedResponse};
 async fn main() -> anyhow::Result<()> {
     let (tx, mut rx) = connect(
         "http://layer.preview.metalbear.co:3000".to_owned(),
-        "dima".to_owned(),
-        "abcd".to_owned(),
+        Some("dima".to_owned()),
     )
     .await?;
 

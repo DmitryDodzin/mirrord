@@ -61,6 +61,11 @@ pub async fn connect(
         bincode::config::standard(),
     )?;
 
+    println!(
+        "{}-{}-<port>.preview.metalbear.co",
+        register.user, register.uid
+    );
+
     let listen_url = format!("{}/{}/{}", server, register.user, register.uid);
 
     let mut stream = reqwest::get(&listen_url).await?.bytes_stream();
