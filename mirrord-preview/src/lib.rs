@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible};
 
 use bincode::{Decode, Encode};
+use reqwest::Body;
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_stream::StreamExt;
@@ -38,8 +39,8 @@ pub async fn connect(
     user: String,
     uid: String,
 ) -> Result<(Sender<ProxiedResponse>, Receiver<ProxiedRequest>), ConnectionError> {
-    let (out_tx, mut out_rx) = mpsc::channel(30);
-    let (in_tx, in_rx) = mpsc::channel(30);
+    let (out_tx, mut out_rx) = mpsc::channel(100);
+    let (in_tx, in_rx) = mpsc::channel(100);
 
     let url = format!("{}/{}/{}", server, user, uid);
 
@@ -60,12 +61,21 @@ pub async fn connect(
     tokio::spawn(async move {
         let client = reqwest::Client::new();
 
-        while let Some(req) = out_rx.recv().await {
-            if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
-                if let Err(err) = client.post(&url).body(payload).send().await {
-                    println!("{:?}", err);
+        let stream = async_stream::stream! {
+            while let Some(req) = out_rx.recv().await {
+                if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
+                    yield Ok::<_, Infallible>(payload)
                 }
             }
+        };
+
+        if let Err(err) = client
+            .post(&url)
+            .body(Body::wrap_stream(stream))
+            .send()
+            .await
+        {
+            println!("{:#?}", err);
         }
     });
 
