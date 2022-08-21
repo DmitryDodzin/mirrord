@@ -10,6 +10,7 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     while let Some(ProxiedRequest {
+        request_id,
         port,
         method: _,
         path,
@@ -20,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
 
         if let Err(_) = tx
             .send(ProxiedResponse {
+                request_id,
                 payload,
                 status: 200,
             })
