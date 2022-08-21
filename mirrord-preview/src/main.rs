@@ -3,7 +3,7 @@ use mirrord_preview::{connect, ProxiedRequest, ProxiedResponse};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let (tx, mut rx) = connect(
-        "http://agent.preview.metalbear.co:3000".to_owned(),
+        "http://layer.preview.metalbear.co:3000".to_owned(),
         "dima".to_owned(),
         "abcd".to_owned(),
     )

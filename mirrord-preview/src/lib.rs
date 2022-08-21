@@ -10,6 +10,8 @@ use tokio_stream::StreamExt;
 pub enum ConnectionError {
     #[error("reqwest error {0:#?}")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("decode error {0:#?}")]
+    MessageDecodeError(#[from] bincode::error::DecodeError),
 }
 
 #[derive(Debug, Encode, Decode)]
@@ -34,17 +36,34 @@ pub struct ProxiedResponse {
     pub payload: HttpPayload,
 }
 
+#[derive(Debug, Encode, Decode)]
+pub struct LayerRegisterReply {
+    pub user: String,
+    pub uid: String,
+}
+
 pub async fn connect(
     server: String,
-    user: String,
-    uid: String,
+    user: Option<String>,
 ) -> Result<(Sender<ProxiedResponse>, Receiver<ProxiedRequest>), ConnectionError> {
     let (out_tx, mut out_rx) = mpsc::channel(100);
     let (in_tx, in_rx) = mpsc::channel(100);
 
-    let url = format!("{}/{}/{}", server, user, uid);
+    let request_url = match user {
+        Some(user) => format!("{}/{}", server, user),
+        None => server.clone(),
+    };
 
-    let mut stream = reqwest::get(&url).await?.bytes_stream();
+    let register_bytes = reqwest::get(request_url).await?.bytes().await?;
+
+    let (register, _) = bincode::decode_from_slice::<LayerRegisterReply, _>(
+        &register_bytes,
+        bincode::config::standard(),
+    )?;
+
+    let listen_url = format!("{}/{}/{}", server, register.user, register.uid);
+
+    let mut stream = reqwest::get(&listen_url).await?.bytes_stream();
 
     tokio::spawn(async move {
         while let Some(Ok(bytes)) = stream.next().await {
@@ -70,7 +89,7 @@ pub async fn connect(
         };
 
         if let Err(err) = client
-            .post(&url)
+            .post(&listen_url)
             .body(Body::wrap_stream(stream))
             .send()
             .await

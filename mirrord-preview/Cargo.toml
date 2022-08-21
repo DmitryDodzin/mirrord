@@ -21,5 +21,4 @@ bincode =  { version = "2.0.0-rc.1" }
 thiserror.workspace = true
 reqwest =  { workspace = true, features = ["stream"] }
 tokio.workspace = true
-tokio-retry = "0.3"
 tokio-stream.workspace = true
