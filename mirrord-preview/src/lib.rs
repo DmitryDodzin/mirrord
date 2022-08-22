@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::Infallible};
 
 use bincode::{error::EncodeError, Decode, Encode};
-use reqwest::{Body, Method};
+use reqwest::{header::AUTHORIZATION, Body, Method};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, error::SendError, Receiver, Sender};
 use tokio_stream::StreamExt;
@@ -59,6 +59,7 @@ pub enum ConnectionStatus {
 
 pub async fn connect(
     server: String,
+    token: String,
     user: Option<String>,
 ) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
     let (out_tx, mut out_rx) = mpsc::channel(100);
@@ -70,7 +71,17 @@ pub async fn connect(
         None => server.clone(),
     };
 
-    let register_bytes = reqwest::get(request_url).await?.bytes().await?;
+    let token = format!("Bearer {}", token);
+
+    let client = reqwest::Client::new();
+
+    let register_bytes = client
+        .get(request_url)
+        .header(AUTHORIZATION, token.clone())
+        .send()
+        .await?
+        .bytes()
+        .await?;
 
     let _ = status_tx.send(ConnectionStatus::Connecting).await;
 
@@ -81,7 +92,12 @@ pub async fn connect(
 
     let listen_url = format!("{}/{}/{}", server, register.user, register.uid);
 
-    let mut stream = reqwest::get(&listen_url).await?.bytes_stream();
+    let mut stream = client
+        .get(&listen_url)
+        .header(AUTHORIZATION, token.clone())
+        .send()
+        .await?
+        .bytes_stream();
 
     let _ = status_tx
         .send(ConnectionStatus::Connected(format!(
@@ -129,6 +145,7 @@ pub async fn connect(
 
         if let Err(err) = client
             .post(&listen_url)
+            .header(AUTHORIZATION, token.clone())
             .body(Body::wrap_stream(stream))
             .send()
             .await
