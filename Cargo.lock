@@ -1486,6 +1486,7 @@ dependencies = [
  "async-stream",
  "bincode",
  "bytes",
+ "http",
  "reqwest",
  "thiserror",
  "tokio",

@@ -19,6 +19,7 @@ async-stream = "0.3"
 bytes.workspace = true
 bincode =  { version = "2.0.0-rc.1" }
 thiserror.workspace = true
+http = "0.2"
 reqwest =  { workspace = true, features = ["stream"] }
 tokio.workspace = true
 tokio-stream.workspace = true
