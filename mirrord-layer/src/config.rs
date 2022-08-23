@@ -15,7 +15,7 @@ pub struct LayerConfig {
     pub image_pull_policy: String,
 
     #[envconfig(from = "MIRRORD_AGENT_IMPERSONATED_POD_NAME")]
-    pub impersonated_pod_name: String,
+    pub impersonated_pod_name: Option<String>,
 
     #[envconfig(from = "MIRRORD_AGENT_IMPERSONATED_POD_NAMESPACE", default = "default")]
     pub impersonated_pod_namespace: String,
@@ -49,4 +49,19 @@ pub struct LayerConfig {
     /// Enables resolving a remote DNS.
     #[envconfig(from = "MIRRORD_REMOTE_DNS", default = "false")]
     pub remote_dns: bool,
+
+    #[envconfig(from = "MIRRORD_AUTH_TOKEN", default = "")]
+    pub auth_token: String,
+
+    #[envconfig(from = "MIRRORD_PREVIEW", default = "false")]
+    pub preview: bool,
+
+    #[envconfig(
+        from = "MIRRORD_PREVIEW_SERVER",
+        default = "https://layer.preview.mirrord.co"
+    )]
+    pub preview_server: String,
+
+    #[envconfig(from = "MIRRORD_PREVIEW_USERNAME")]
+    pub preview_username: Option<String>,
 }

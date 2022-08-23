@@ -75,7 +75,10 @@ fn exec(args: &ExecArgs) -> Result<()> {
         "Launching {:?} with arguments {:?}",
         args.binary, args.binary_args
     );
-    std::env::set_var("MIRRORD_AGENT_IMPERSONATED_POD_NAME", args.pod_name.clone());
+
+    if let Some(pod_name) = &args.pod_name {
+        std::env::set_var("MIRRORD_AGENT_IMPERSONATED_POD_NAME", pod_name.clone());
+    }
 
     if let Some(namespace) = &args.pod_namespace {
         std::env::set_var(
@@ -148,6 +151,20 @@ fn exec(args: &ExecArgs) -> Result<()> {
     Err(anyhow!("Failed to execute binary"))
 }
 
+fn preview(args: &PreviewArgs) -> Result<()> {
+    std::env::set_var("MIRRORD_PREVIEW", "true");
+
+    if let Some(server) = &args.server {
+        std::env::set_var("MIRRORD_PREVIEW_SERVER", server.as_str());
+    }
+
+    if let Some(username) = &args.username {
+        std::env::set_var("MIRRORD_PREVIEW_USERNAME", username.as_str());
+    }
+
+    exec(&args.exec)
+}
+
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() -> Result<()> {
     registry()
@@ -162,6 +179,7 @@ fn main() -> Result<()> {
         Commands::Extract { path } => {
             extract_library(Some(path))?;
         }
+        Commands::Preview(args) => preview(&args)?,
     }
     Ok(())
 }

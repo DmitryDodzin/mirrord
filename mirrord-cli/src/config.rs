@@ -10,6 +10,7 @@ pub(super) struct Cli {
 #[derive(Subcommand)]
 pub(super) enum Commands {
     Exec(Box<ExecArgs>),
+    Preview(Box<PreviewArgs>),
     Extract {
         #[clap(value_parser)]
         path: String,
@@ -20,7 +21,7 @@ pub(super) enum Commands {
 pub(super) struct ExecArgs {
     /// Pod name to mirror.
     #[clap(short, long, value_parser)]
-    pub pod_name: String,
+    pub pod_name: Option<String>,
 
     /// Namespace of the pod to mirror. Defaults to "default".
     #[clap(short = 'n', long, value_parser)]
@@ -81,4 +82,18 @@ pub(super) struct ExecArgs {
     /// Use an Ephemeral Container to mirror traffic.
     #[clap(short, long, value_parser)]
     pub ephemeral_container: bool,
+}
+
+#[derive(Args, Debug)]
+pub(super) struct PreviewArgs {
+    /// Override Preview Server Connection
+    #[clap(long, value_parser)]
+    pub server: Option<String>,
+
+    /// Override Username for Preview Server
+    #[clap(long, value_parser)]
+    pub username: Option<String>,
+
+    #[clap(flatten)]
+    pub exec: ExecArgs,
 }

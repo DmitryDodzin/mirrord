@@ -130,30 +130,37 @@ fn init() {
     info!("Initializing mirrord-layer!");
 
     let config = LayerConfig::init_from_env().unwrap();
-    let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
 
-    info!("Using port `{connection_port:?}` for communication");
+    if config.preview {
+        RUNTIME.spawn(start_preview_connection(config.clone()));
+    }
 
-    let port_forwarder = RUNTIME
-        .block_on(pod_api::create_agent(config.clone(), connection_port))
-        .unwrap_or_else(|e| {
-            panic!("failed to create agent: {}", e);
-        });
+    if config.impersonated_pod_name.is_some() {
+        let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
 
-    let (sender, receiver) = channel::<HookMessage>(1000);
-    unsafe {
-        HOOK_SENDER = Some(sender);
-    };
+        info!("Using port `{connection_port:?}` for communication");
 
-    let enabled_file_ops = ENABLED_FILE_OPS.get_or_init(|| config.enabled_file_ops);
-    enable_hooks(*enabled_file_ops, config.remote_dns);
+        let port_forwarder = RUNTIME
+            .block_on(pod_api::create_agent(config.clone(), connection_port))
+            .unwrap_or_else(|e| {
+                panic!("failed to create agent: {}", e);
+            });
 
-    RUNTIME.block_on(start_layer_thread(
-        port_forwarder,
-        receiver,
-        config,
-        connection_port,
-    ));
+        let (sender, receiver) = channel::<HookMessage>(1000);
+        unsafe {
+            HOOK_SENDER = Some(sender);
+        };
+
+        let enabled_file_ops = ENABLED_FILE_OPS.get_or_init(|| config.enabled_file_ops);
+        enable_hooks(*enabled_file_ops, config.remote_dns);
+
+        RUNTIME.block_on(start_layer_thread(
+            port_forwarder,
+            receiver,
+            config,
+            connection_port,
+        ));
+    }
 }
 
 struct Layer<T>
@@ -363,6 +370,29 @@ async fn start_layer_thread(
     }
 
     let _ = tokio::spawn(thread_loop(receiver, codec));
+}
+
+/// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
+async fn start_preview_connection(config: LayerConfig) {
+    let LayerConfig {
+        preview_server,
+        auth_token,
+        preview_username,
+        ..
+    } = config;
+
+    let connection = mirrord_preview::connect(preview_server, auth_token, preview_username).await;
+
+    match connection {
+        Ok(mut status) => {
+            while let Some(status) = status.recv().await {
+                info!("{:?}", status);
+            }
+        }
+        Err(err) => {
+            panic!("{:?}", err)
+        }
+    };
 }
 
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.

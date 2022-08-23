@@ -88,6 +88,9 @@ pub(crate) async fn create_agent(
         ..
     } = config.clone();
 
+    let impersonated_pod_name = impersonated_pod_name
+        .expect("Agent connection should not start with impersonated_pod_name as None");
+
     let client = if accept_invalid_certificates {
         let mut config = Config::infer().await?;
         config.accept_invalid_certs = true;
@@ -216,15 +219,20 @@ async fn create_ephemeral_container_agent(
     }))?;
     debug!("Requesting ephemeral_containers_subresource");
 
+    let impersonated_pod_name = config
+        .impersonated_pod_name
+        .clone()
+        .expect("Agent connection should not start with impersonated_pod_name as None");
+
     let mut ephemeral_containers_subresource = pods_api
-        .get_subresource("ephemeralcontainers", &config.impersonated_pod_name)
+        .get_subresource("ephemeralcontainers", &impersonated_pod_name)
         .await
         .map_err(LayerError::KubeError)?;
 
     let mut spec = ephemeral_containers_subresource
         .spec
         .as_mut()
-        .ok_or_else(|| LayerError::PodSpecNotFound(config.impersonated_pod_name.clone()))?;
+        .ok_or_else(|| LayerError::PodSpecNotFound(impersonated_pod_name.clone()))?;
 
     spec.ephemeral_containers = match spec.ephemeral_containers.clone() {
         Some(mut ephemeral_containers) => {
@@ -237,7 +245,7 @@ async fn create_ephemeral_container_agent(
     pods_api
         .replace_subresource(
             "ephemeralcontainers",
-            &config.impersonated_pod_name,
+            &impersonated_pod_name,
             &PostParams::default(),
             to_vec(&ephemeral_containers_subresource).unwrap(),
         )
@@ -245,7 +253,7 @@ async fn create_ephemeral_container_agent(
         .map_err(LayerError::KubeError)?;
 
     let params = ListParams::default()
-        .fields(&format!("metadata.name={}", &config.impersonated_pod_name))
+        .fields(&format!("metadata.name={}", &impersonated_pod_name))
         .timeout(60);
 
     let stream = watcher(pods_api.clone(), params).applied_objects();
@@ -260,10 +268,10 @@ async fn create_ephemeral_container_agent(
         }
     }
 
-    wait_for_agent_startup(pods_api, &config.impersonated_pod_name, mirrord_agent_name).await?;
+    wait_for_agent_startup(pods_api, &impersonated_pod_name, mirrord_agent_name).await?;
 
     debug!("container is ready");
-    Ok(config.impersonated_pod_name.clone())
+    Ok(impersonated_pod_name)
 }
 
 async fn create_job_pod_agent(

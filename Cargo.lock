@@ -1456,6 +1456,7 @@ dependencies = [
  "kube",
  "libc",
  "mirrord-macro",
+ "mirrord-preview",
  "mirrord-protocol",
  "nix",
  "rand 0.8.5",
@@ -1480,9 +1481,8 @@ dependencies = [
 
 [[package]]
 name = "mirrord-preview"
-version = "2.7.0"
+version = "2.8.1"
 dependencies = [
- "anyhow",
  "async-stream",
  "bincode",
  "bytes",

@@ -71,13 +71,13 @@ pub async fn connect(
         None => server.clone(),
     };
 
-    let token = format!("Bearer {}", token);
+    let auth_header = format!("Bearer {}", token);
 
     let client = reqwest::Client::new();
 
     let register_bytes = client
         .get(request_url)
-        .header(AUTHORIZATION, token.clone())
+        .header(AUTHORIZATION, auth_header.clone())
         .send()
         .await?
         .bytes()
@@ -94,7 +94,7 @@ pub async fn connect(
 
     let mut stream = client
         .get(&listen_url)
-        .header(AUTHORIZATION, token.clone())
+        .header(AUTHORIZATION, auth_header)
         .send()
         .await?
         .bytes_stream();
