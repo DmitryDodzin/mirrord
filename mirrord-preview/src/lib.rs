@@ -94,7 +94,7 @@ pub async fn connect(
 
     let mut stream = client
         .get(&listen_url)
-        .header(AUTHORIZATION, auth_header)
+        .header(AUTHORIZATION, auth_header.clone())
         .send()
         .await?
         .bytes_stream();
@@ -145,7 +145,7 @@ pub async fn connect(
 
         if let Err(err) = client
             .post(&listen_url)
-            .header(AUTHORIZATION, token.clone())
+            .header(AUTHORIZATION, auth_header)
             .body(Body::wrap_stream(stream))
             .send()
             .await
