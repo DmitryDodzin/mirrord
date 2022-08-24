@@ -1,4 +1,7 @@
-use std::{collections::HashMap, convert::Infallible};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+};
 
 use bincode::{error::EncodeError, Decode, Encode};
 use reqwest::{header::AUTHORIZATION, Body, Method};
@@ -57,18 +60,34 @@ pub enum ConnectionStatus {
     Error(ConnectionError),
 }
 
+#[derive(Default)]
+pub struct FilterPorts(HashSet<u32>);
+
+impl FilterPorts {
+    fn is_allowed(&self, port: u32) -> bool {
+        !self.0.contains(&port)
+    }
+}
+
+#[derive(Default)]
+pub struct PreviewConfig {
+    pub server: String,
+    pub username: Option<String>,
+    pub allow_ports: Option<FilterPorts>,
+    pub deny_ports: FilterPorts,
+}
+
 pub async fn connect(
-    server: String,
     token: String,
-    user: Option<String>,
+    config: PreviewConfig,
 ) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
     let (out_tx, mut out_rx) = mpsc::channel(100);
     let (in_tx, in_rx) = mpsc::channel(100);
     let (status_tx, status_rx) = mpsc::channel(100);
 
-    let request_url = match user {
-        Some(user) => format!("{}/{}", server, user),
-        None => server.clone(),
+    let request_url = match config.username {
+        Some(ref user) => format!("{}/{}", config.server, user),
+        None => config.server.clone(),
     };
 
     let auth_header = format!("Bearer {}", token);
@@ -90,7 +109,7 @@ pub async fn connect(
         bincode::config::standard(),
     )?;
 
-    let listen_url = format!("{}/{}/{}", server, register.user, register.uid);
+    let listen_url = format!("{}/{}/{}", config.server, register.user, register.uid);
 
     let mut stream = client
         .get(&listen_url)
@@ -158,7 +177,7 @@ pub async fn connect(
 
     let client_connection_status_tx = status_tx.clone();
     tokio::spawn(async move {
-        if let Err(err) = wrap_connection(out_tx, in_rx).await {
+        if let Err(err) = wrap_connection(out_tx, in_rx, config).await {
             let _ = client_connection_status_tx
                 .send(ConnectionStatus::Error(err))
                 .await;
@@ -171,6 +190,7 @@ pub async fn connect(
 pub async fn wrap_connection(
     tx: Sender<ProxiedResponse>,
     mut rx: Receiver<ProxiedRequest>,
+    config: PreviewConfig,
 ) -> Result<(), ConnectionError> {
     let client = reqwest::Client::new();
 
@@ -182,38 +202,58 @@ pub async fn wrap_connection(
         payload,
     }) = rx.recv().await
     {
-        let url = format!("http://127.0.0.1:{}{}", port, path);
+        if config
+            .allow_ports
+            .as_ref()
+            .map(|list| list.is_allowed(port))
+            .unwrap_or(false)
+            && config.deny_ports.is_allowed(port)
+        {
+            let url = format!("http://127.0.0.1:{}{}", port, path);
 
-        let method = Method::from_bytes(method.as_bytes())?;
+            let method = Method::from_bytes(method.as_bytes())?;
 
-        let mut builder = client.request(method, url);
+            let mut builder = client.request(method, url);
 
-        for (name, value) in payload.headers {
-            builder = builder.header(name, value);
-        }
+            for (name, value) in payload.headers {
+                builder = builder.header(name, value);
+            }
 
-        if let Ok(response) = builder.body(payload.body).send().await {
-            let headers = response
-                .headers()
-                .iter()
-                .filter_map(|(name, value)| {
-                    value
-                        .to_str()
-                        .ok()
-                        .map(|value| (name.as_str().to_owned(), value.to_owned()))
+            if let Ok(response) = builder.body(payload.body).send().await {
+                let headers = response
+                    .headers()
+                    .iter()
+                    .filter_map(|(name, value)| {
+                        value
+                            .to_str()
+                            .ok()
+                            .map(|value| (name.as_str().to_owned(), value.to_owned()))
+                    })
+                    .collect();
+
+                let status = response.status().as_u16();
+
+                let body = response.bytes().await?.to_vec();
+
+                let payload = HttpPayload { headers, body };
+
+                tx.send(ProxiedResponse {
+                    payload,
+                    request_id,
+                    status,
                 })
-                .collect();
-
-            let status = response.status().as_u16();
-
-            let body = response.bytes().await?.to_vec();
-
-            let payload = HttpPayload { headers, body };
+                .await?;
+            }
+        } else {
+            let payload = HttpPayload {
+                headers: HashMap::new(),
+                body: b"Not Allowed Port".to_vec(),
+            };
 
             tx.send(ProxiedResponse {
                 payload,
                 request_id,
-                status,
+                status: 401,
             })
             .await?;
         }

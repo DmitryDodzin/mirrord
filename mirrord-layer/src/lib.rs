@@ -21,6 +21,7 @@ use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
 use mirrord_macro::hook_fn;
+use mirrord_preview::PreviewConfig;
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
@@ -375,13 +376,19 @@ async fn start_layer_thread(
 /// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
 async fn start_preview_connection(config: LayerConfig) {
     let LayerConfig {
-        preview_server,
         auth_token,
-        preview_username,
+        preview_server: server,
+        preview_username: username,
         ..
     } = config;
 
-    let connection = mirrord_preview::connect(preview_server, auth_token, preview_username).await;
+    let config = PreviewConfig {
+        server,
+        username,
+        ..Default::default()
+    };
+
+    let connection = mirrord_preview::connect(auth_token, config).await;
 
     match connection {
         Ok(mut status) => {

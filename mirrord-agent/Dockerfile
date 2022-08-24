@@ -6,6 +6,7 @@ COPY sample/rust /app/sample/rust
 COPY mirrord-protocol /app/mirrord-protocol
 COPY mirrord-agent /app/mirrord-agent
 COPY mirrord-macro /app/mirrord-macro
+COPY mirrord-preview /app/mirrord-preview
 COPY mirrord-layer /app/mirrord-layer
 COPY mirrord-cli /app/mirrord-cli
 COPY tests /app/tests
