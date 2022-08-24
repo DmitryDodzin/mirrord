@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::Infallible,
+    str::FromStr,
 };
 
 use bincode::{error::EncodeError, Decode, Encode};
@@ -60,12 +61,41 @@ pub enum ConnectionStatus {
     Error(ConnectionError),
 }
 
-#[derive(Default)]
-pub struct FilterPorts(HashSet<u32>);
+#[derive(Default, Clone)]
+pub struct FilterPorts {
+    ranges: Vec<(u32, u32)>,
+    specific: HashSet<u32>,
+}
 
 impl FilterPorts {
-    fn is_allowed(&self, port: u32) -> bool {
-        !self.0.contains(&port)
+    fn is_match(&self, port: u32) -> bool {
+        for (start, end) in &self.ranges {
+            if port > *start && port < *end {
+                return true;
+            }
+        }
+
+        self.specific.contains(&port)
+    }
+}
+
+impl FromStr for FilterPorts {
+    type Err = <u32 as FromStr>::Err;
+
+    fn from_str(source: &str) -> Result<Self, <Self as FromStr>::Err> {
+        let mut filter = Self::default();
+
+        for part in source.split(',') {
+            if part.contains("..") {
+                let part: Vec<&str> = part.splitn(2, "..").collect();
+
+                filter.ranges.push((part[0].parse()?, part[1].parse()?));
+            } else {
+                filter.specific.insert(part.parse()?);
+            }
+        }
+
+        Ok(filter)
     }
 }
 
@@ -205,9 +235,9 @@ pub async fn wrap_connection(
         if config
             .allow_ports
             .as_ref()
-            .map(|list| list.is_allowed(port))
+            .map(|list| list.is_match(port))
             .unwrap_or(false)
-            && config.deny_ports.is_allowed(port)
+            && !config.deny_ports.is_match(port)
         {
             let url = format!("http://127.0.0.1:{}{}", port, path);
 

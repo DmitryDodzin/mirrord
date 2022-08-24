@@ -379,13 +379,16 @@ async fn start_preview_connection(config: LayerConfig) {
         auth_token,
         preview_server: server,
         preview_username: username,
+        preview_allow_ports: allow_ports,
+        preview_deny_ports: deny_ports,
         ..
     } = config;
 
     let config = PreviewConfig {
         server,
         username,
-        ..Default::default()
+        allow_ports,
+        deny_ports: deny_ports.unwrap_or_default(),
     };
 
     let connection = mirrord_preview::connect(auth_token, config).await;

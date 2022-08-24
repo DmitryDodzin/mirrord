@@ -162,6 +162,14 @@ fn preview(args: &PreviewArgs) -> Result<()> {
         std::env::set_var("MIRRORD_PREVIEW_USERNAME", username.as_str());
     }
 
+    if let Some(allow_ports) = &args.allow_ports {
+        std::env::set_var("MIRRORD_PREVIEW_ALLOW_PORTS", allow_ports.as_str());
+    }
+
+    if let Some(deny_ports) = &args.deny_ports {
+        std::env::set_var("MIRRORD_PREVIEW_DENY_PORTS", deny_ports.as_str());
+    }
+
     exec(&args.exec)
 }
 

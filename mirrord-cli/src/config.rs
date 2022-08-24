@@ -94,6 +94,14 @@ pub(super) struct PreviewArgs {
     #[clap(long, value_parser)]
     pub username: Option<String>,
 
+    /// List of allowed ports or port ranges delimited by ',' and port format '<start>..<end>'
+    #[clap(long, value_parser)]
+    pub allow_ports: Option<String>,
+
+    /// List of denied ports or port ranges delimited by ',' and port format '<start>..<end>'
+    #[clap(long, value_parser)]
+    pub deny_ports: Option<String>,
+
     #[clap(flatten)]
     pub exec: ExecArgs,
 }

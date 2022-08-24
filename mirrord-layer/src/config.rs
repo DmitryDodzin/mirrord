@@ -1,4 +1,5 @@
 use envconfig::Envconfig;
+use mirrord_preview::FilterPorts;
 
 #[derive(Envconfig, Clone)]
 pub struct LayerConfig {
@@ -64,4 +65,10 @@ pub struct LayerConfig {
 
     #[envconfig(from = "MIRRORD_PREVIEW_USERNAME")]
     pub preview_username: Option<String>,
+
+    #[envconfig(from = "MIRRORD_PREVIEW_ALLOW_PORTS")]
+    pub preview_allow_ports: Option<FilterPorts>,
+
+    #[envconfig(from = "MIRRORD_PREVIEW_DENY_PORTS")]
+    pub preview_deny_ports: Option<FilterPorts>,
 }
