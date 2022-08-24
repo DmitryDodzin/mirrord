@@ -52,6 +52,7 @@ pub struct ProxiedResponse {
 pub struct LayerRegisterReply {
     pub user: String,
     pub uid: String,
+    pub domain: String,
 }
 
 #[derive(Debug)]
@@ -150,8 +151,8 @@ pub async fn connect(
 
     let _ = status_tx
         .send(ConnectionStatus::Connected(format!(
-            "{}-{}-<port>.preview.metalbear.co",
-            register.user, register.uid
+            "{}-{}-<port>.{}",
+            register.user, register.uid, register.domain
         )))
         .await;
 
