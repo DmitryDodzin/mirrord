@@ -59,7 +59,7 @@ pub struct LayerConfig {
 
     #[envconfig(
         from = "MIRRORD_PREVIEW_SERVER",
-        default = "https://layer.preview.mirrord.co"
+        default = "https://layer.preview.metalbear.dev"
     )]
     pub preview_server: String,
 

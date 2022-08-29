@@ -9,6 +9,7 @@ use reqwest::{header::AUTHORIZATION, Body, Method};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, error::SendError, Receiver, Sender};
 use tokio_stream::StreamExt;
+use tracing::debug;
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -60,6 +61,7 @@ pub enum ConnectionStatus {
     Connecting,
     Connected(String),
     Error(ConnectionError),
+    Disconnected,
 }
 
 #[derive(Default, Clone)]
@@ -125,58 +127,84 @@ pub async fn connect(
 
     let client = reqwest::Client::new();
 
+    debug!(
+        "plan request url: {:?} | auth: {:?}",
+        request_url, auth_header
+    );
+
     let register_bytes = client
-        .get(request_url)
+        .get(&request_url)
         .header(AUTHORIZATION, auth_header.clone())
         .send()
         .await?
         .bytes()
         .await?;
 
-    let _ = status_tx.send(ConnectionStatus::Connecting).await;
-
     let (register, _) = bincode::decode_from_slice::<LayerRegisterReply, _>(
         &register_bytes,
         bincode::config::standard(),
     )?;
 
+    debug!(
+        "request complete url: {:?} | register: {:?}",
+        request_url, register
+    );
+
     let listen_url = format!("{}/{}/{}", config.server, register.user, register.uid);
 
-    let mut stream = client
-        .get(&listen_url)
-        .header(AUTHORIZATION, auth_header.clone())
-        .send()
-        .await?
-        .bytes_stream();
-
-    let _ = status_tx
-        .send(ConnectionStatus::Connected(format!(
-            "{}-{}-<port>.{}",
-            register.user, register.uid, register.domain
-        )))
-        .await;
-
     let inbound_connection_status_tx = status_tx.clone();
+    let inboubd_listen_url = listen_url.clone();
+    let inboubd_auth_header = auth_header.clone();
     tokio::spawn(async move {
-        while let Some(Ok(bytes)) = stream.next().await {
-            match bincode::decode_from_slice::<ProxiedRequest, _>(
-                &bytes,
-                bincode::config::standard(),
-            ) {
-                Ok((request, _size)) => {
-                    if let Err(request) = in_tx.send(request).await {
-                        let _ = inbound_connection_status_tx
-                            .send(ConnectionStatus::Error(
-                                ConnectionError::ProxiedRequestDropped(request),
-                            ))
-                            .await;
+        let _ = inbound_connection_status_tx
+            .send(ConnectionStatus::Connecting)
+            .await;
+
+        match client
+            .get(inboubd_listen_url)
+            .header(AUTHORIZATION, inboubd_auth_header)
+            .send()
+            .await
+            .map(|res| res.bytes_stream())
+        {
+            Ok(mut stream) => {
+                let _ = inbound_connection_status_tx
+                    .send(ConnectionStatus::Connected(format!(
+                        "{}-{}-<port>.{}",
+                        register.user, register.uid, register.domain
+                    )))
+                    .await;
+
+                while let Some(Ok(bytes)) = stream.next().await {
+                    match bincode::decode_from_slice::<ProxiedRequest, _>(
+                        &bytes,
+                        bincode::config::standard(),
+                    ) {
+                        Ok((request, _size)) => {
+                            if let Err(request) = in_tx.send(request).await {
+                                let _ = inbound_connection_status_tx
+                                    .send(ConnectionStatus::Error(
+                                        ConnectionError::ProxiedRequestDropped(request),
+                                    ))
+                                    .await;
+                            }
+                        }
+                        Err(err) => {
+                            let _ = inbound_connection_status_tx
+                                .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                                .await;
+                        }
                     }
                 }
-                Err(err) => {
-                    let _ = inbound_connection_status_tx
-                        .send(ConnectionStatus::Error(ConnectionError::from(err)))
-                        .await;
-                }
+
+                let _ = inbound_connection_status_tx
+                    .send(ConnectionStatus::Disconnected)
+                    .await;
+            }
+            Err(err) => {
+                let _ = inbound_connection_status_tx
+                    .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                    .await;
             }
         }
     });
@@ -204,6 +232,10 @@ pub async fn connect(
                 .send(ConnectionStatus::Error(ConnectionError::from(err)))
                 .await;
         }
+
+        let _ = outbound_connection_status_tx
+            .send(ConnectionStatus::Disconnected)
+            .await;
     });
 
     let client_connection_status_tx = status_tx.clone();
