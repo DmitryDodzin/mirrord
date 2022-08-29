@@ -7,6 +7,21 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+- mirrord-cli add login command for logging in to metalbear-cloud
+
+## 2.9.1
+### Fixed
+- CI - set typescript version at 4.7.4 to fix broken release action
+
+## 2.9.0
+### Added
+- Support for Golang fileops
+- IntelliJ Extension for mirrord
+
+### Changed
+- mirrord-layer: Added common `Result` type to to reduce boilerplate, removed dependency of `anyhow` crate.
+- mirrord-layer: Split `LayerError` into `LayerError` and `HookError` to distinguish between errors that can be handled by the layer and errors that can be handled by the hook. (no more requiring libc errno for each error!). Closes [#247](https://github.com/metalbear-co/mirrord/issues/247)
 
 ## 2.8.1
 
