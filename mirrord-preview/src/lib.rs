@@ -269,7 +269,7 @@ pub async fn wrap_connection(
             .allow_ports
             .as_ref()
             .map(|list| list.is_match(port))
-            .unwrap_or(false)
+            .unwrap_or(true)
             && !config.deny_ports.is_match(port)
         {
             let url = format!("http://127.0.0.1:{}{}", port, path);
