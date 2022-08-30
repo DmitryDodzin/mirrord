@@ -9,21 +9,21 @@ use reqwest::{header::AUTHORIZATION, Body, Method};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, error::SendError, Receiver, Sender};
 use tokio_stream::StreamExt;
-use tracing::debug;
+use tracing::{error, trace};
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
-    #[error("reqwest error {0:#?}")]
+    #[error("reqwest error {0}")]
     ReqwestError(#[from] reqwest::Error),
-    #[error("decode error {0:#?}")]
+    #[error("decode error {0}")]
     MessageDecodeError(#[from] bincode::error::DecodeError),
-    #[error("invalid method {0:#?}")]
+    #[error("invalid method {0}")]
     InvalidMethod(#[from] http::method::InvalidMethod),
-    #[error("falied to serialize {0:#?}")]
+    #[error("falied to serialize {0}")]
     SerializationError(#[from] EncodeError),
-    #[error("request failed to send {0:#?}")]
+    #[error("request failed to send {0}")]
     ProxiedRequestDropped(#[from] SendError<ProxiedRequest>),
-    #[error("response failed to send {0:#?}")]
+    #[error("response failed to send {0}")]
     ProxiedResponseDropped(#[from] SendError<ProxiedResponse>),
 }
 
@@ -43,10 +43,14 @@ pub struct ProxiedRequest {
 }
 
 #[derive(Debug, Encode, Decode)]
+pub struct ProxiedError {
+    message: String,
+}
+
+#[derive(Debug, Encode, Decode)]
 pub struct ProxiedResponse {
     pub request_id: u64,
-    pub status: u16,
-    pub payload: HttpPayload,
+    pub payload: Result<(u16, HttpPayload), ProxiedError>,
 }
 
 #[derive(Debug, Encode, Decode)]
@@ -64,7 +68,7 @@ pub enum ConnectionStatus {
     Disconnected,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct FilterPorts {
     ranges: Vec<(u32, u32)>,
     specific: HashSet<u32>,
@@ -102,7 +106,7 @@ impl FromStr for FilterPorts {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PreviewConfig {
     pub server: String,
     pub username: Option<String>,
@@ -127,11 +131,6 @@ pub async fn connect(
 
     let client = reqwest::Client::new();
 
-    debug!(
-        "plan request url: {:?} | auth: {:?}",
-        request_url, auth_header
-    );
-
     let register_bytes = client
         .get(&request_url)
         .header(AUTHORIZATION, auth_header.clone())
@@ -145,24 +144,25 @@ pub async fn connect(
         bincode::config::standard(),
     )?;
 
-    debug!(
-        "request complete url: {:?} | register: {:?}",
-        request_url, register
+    trace!(
+        "connect -> url: {:?} | register: {:?}",
+        request_url,
+        register
     );
 
     let listen_url = format!("{}/{}/{}", config.server, register.user, register.uid);
 
     let inbound_connection_status_tx = status_tx.clone();
-    let inboubd_listen_url = listen_url.clone();
-    let inboubd_auth_header = auth_header.clone();
+    let inbound_listen_url = listen_url.clone();
+    let inbound_auth_header = auth_header.clone();
     tokio::spawn(async move {
         let _ = inbound_connection_status_tx
             .send(ConnectionStatus::Connecting)
             .await;
 
         match client
-            .get(inboubd_listen_url)
-            .header(AUTHORIZATION, inboubd_auth_header)
+            .get(inbound_listen_url)
+            .header(AUTHORIZATION, inbound_auth_header)
             .send()
             .await
             .map(|res| res.bytes_stream())
@@ -176,6 +176,8 @@ pub async fn connect(
                     .await;
 
                 while let Some(Ok(bytes)) = stream.next().await {
+                    trace!("connect -> inbound -> bytes {:?}(lenght)", bytes.len());
+
                     match bincode::decode_from_slice::<ProxiedRequest, _>(
                         &bytes,
                         bincode::config::standard(),
@@ -197,6 +199,8 @@ pub async fn connect(
                     }
                 }
 
+                trace!("connect -> inbound -> closed");
+
                 let _ = inbound_connection_status_tx
                     .send(ConnectionStatus::Disconnected)
                     .await;
@@ -210,20 +214,24 @@ pub async fn connect(
     });
 
     let outbound_connection_status_tx = status_tx.clone();
+    let outbound_listen_url = listen_url;
+    let outbound_auth_header = auth_header;
     tokio::spawn(async move {
         let client = reqwest::Client::new();
 
         let stream = async_stream::stream! {
             while let Some(req) = out_rx.recv().await {
                 if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
+                    trace!("connect -> outbound -> bytes {:?}(lenght)", payload.len());
+
                     yield Ok::<_, Infallible>(payload)
                 }
             }
         };
 
         if let Err(err) = client
-            .post(&listen_url)
-            .header(AUTHORIZATION, auth_header)
+            .post(&outbound_listen_url)
+            .header(AUTHORIZATION, outbound_auth_header)
             .body(Body::wrap_stream(stream))
             .send()
             .await
@@ -233,19 +241,14 @@ pub async fn connect(
                 .await;
         }
 
+        trace!("connect -> outbound -> closed");
+
         let _ = outbound_connection_status_tx
             .send(ConnectionStatus::Disconnected)
             .await;
     });
 
-    let client_connection_status_tx = status_tx.clone();
-    tokio::spawn(async move {
-        if let Err(err) = wrap_connection(out_tx, in_rx, config).await {
-            let _ = client_connection_status_tx
-                .send(ConnectionStatus::Error(err))
-                .await;
-        }
-    });
+    tokio::spawn(wrap_connection(out_tx, in_rx, config));
 
     Ok(status_rx)
 }
@@ -254,58 +257,26 @@ pub async fn wrap_connection(
     tx: Sender<ProxiedResponse>,
     mut rx: Receiver<ProxiedRequest>,
     config: PreviewConfig,
-) -> Result<(), ConnectionError> {
+) {
+    trace!("wrap_connection -> config {:?}", config);
+
     let client = reqwest::Client::new();
 
-    while let Some(ProxiedRequest {
-        method,
-        request_id,
-        port,
-        path,
-        payload,
-    }) = rx.recv().await
-    {
-        if config
+    while let Some(req) = rx.recv().await {
+        let request_id = req.request_id;
+
+        let response = if config
             .allow_ports
             .as_ref()
-            .map(|list| list.is_match(port))
+            .map(|list| list.is_match(req.port))
             .unwrap_or(true)
-            && !config.deny_ports.is_match(port)
+            && !config.deny_ports.is_match(req.port)
         {
-            let url = format!("http://127.0.0.1:{}{}", port, path);
+            let payload = handle_proxied_message(&client, req).await;
 
-            let method = Method::from_bytes(method.as_bytes())?;
-
-            let mut builder = client.request(method, url);
-
-            for (name, value) in payload.headers {
-                builder = builder.header(name, value);
-            }
-
-            if let Ok(response) = builder.body(payload.body).send().await {
-                let headers = response
-                    .headers()
-                    .iter()
-                    .filter_map(|(name, value)| {
-                        value
-                            .to_str()
-                            .ok()
-                            .map(|value| (name.as_str().to_owned(), value.to_owned()))
-                    })
-                    .collect();
-
-                let status = response.status().as_u16();
-
-                let body = response.bytes().await?.to_vec();
-
-                let payload = HttpPayload { headers, body };
-
-                tx.send(ProxiedResponse {
-                    payload,
-                    request_id,
-                    status,
-                })
-                .await?;
+            ProxiedResponse {
+                request_id,
+                payload,
             }
         } else {
             let payload = HttpPayload {
@@ -313,14 +284,81 @@ pub async fn wrap_connection(
                 body: b"Not Allowed Port".to_vec(),
             };
 
-            tx.send(ProxiedResponse {
-                payload,
+            ProxiedResponse {
                 request_id,
-                status: 401,
-            })
-            .await?;
-        }
+                payload: Ok((401, payload)),
+            }
+        };
+
+        trace!("wrap_connection -> response {:?}", response);
+
+        let _ = tx
+            .send(response)
+            .await
+            .map_err(|err| error!("wrap_connection -> error {}", err));
+    }
+}
+
+async fn handle_proxied_message(
+    client: &reqwest::Client,
+    req: ProxiedRequest,
+) -> Result<(u16, HttpPayload), ProxiedError> {
+    trace!("handle_proxied_message -> {:?}", req);
+
+    let ProxiedRequest {
+        method,
+        port,
+        path,
+        payload,
+        ..
+    } = req;
+
+    let url = format!("http://127.0.0.1:{}{}", port, path);
+
+    let method = Method::from_bytes(method.as_bytes()).map_err(|err| ProxiedError {
+        message: format!("method parse error:\n{}", err),
+    })?;
+
+    let mut builder = client.request(method, url);
+
+    for (name, value) in payload.headers {
+        builder = builder.header(name, value);
     }
 
-    Ok(())
+    let response = builder
+        .body(payload.body)
+        .send()
+        .await
+        .map_err(|err| ProxiedError {
+            message: format!("proxy error:\n{}", err),
+        })?;
+
+    let headers = response
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.as_str().to_owned(), value.to_owned()))
+        })
+        .collect();
+
+    let status = response.status().as_u16();
+
+    response
+        .bytes()
+        .await
+        .map(|body| {
+            (
+                status,
+                HttpPayload {
+                    headers,
+                    body: body.to_vec(),
+                },
+            )
+        })
+        .map_err(|err| ProxiedError {
+            message: format!("response read error:\n{}", err),
+        })
 }
