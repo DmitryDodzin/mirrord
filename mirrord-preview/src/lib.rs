@@ -44,7 +44,7 @@ pub struct ProxiedRequest {
 
 #[derive(Debug, Encode, Decode)]
 pub struct ProxiedError {
-    message: String,
+    pub message: String,
 }
 
 #[derive(Debug, Encode, Decode)]
