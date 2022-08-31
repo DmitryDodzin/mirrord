@@ -403,7 +403,8 @@ async fn start_preview_connection(config: LayerConfig) {
                     ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
                     ConnectionStatus::Error(err) => {
                         error!("start_preview_connection -> status error {}", err);
-
+                    }
+                    ConnectionStatus::Disconnected => {
                         let _ =
                             signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
                     }
