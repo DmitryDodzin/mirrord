@@ -170,7 +170,7 @@ pub async fn connect(
             Ok(mut stream) => {
                 let _ = inbound_connection_status_tx
                     .send(ConnectionStatus::Connected(format!(
-                        "{}-{}-<port>.{}",
+                        "https://{}-{}-<port>.{}",
                         register.user, register.uid, register.domain
                     )))
                     .await;
