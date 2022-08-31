@@ -1,5 +1,6 @@
 use std::{collections::HashMap, convert::Infallible};
 
+use mirrord_auth::AuthConfig;
 use reqwest::{header::AUTHORIZATION, Body, Method};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_stream::StreamExt;
@@ -18,10 +19,9 @@ struct ConnectionConfig {
     status_tx: Sender<ConnectionStatus>,
 }
 
-pub async fn connect(
-    token: String,
-    config: PreviewConfig,
-) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
+pub async fn connect(config: PreviewConfig) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
+    let auth_config = AuthConfig::load()?;
+
     let (out_tx, out_rx) = mpsc::channel(100);
     let (in_tx, in_rx) = mpsc::channel(100);
     let (status_tx, status_rx) = mpsc::channel(100);
@@ -31,7 +31,7 @@ pub async fn connect(
         None => config.server.clone(),
     };
 
-    let auth_header = format!("Bearer {}", token);
+    let auth_header = format!("Bearer {}", auth_config.access_token);
 
     let register_bytes = reqwest::Client::new()
         .get(&request_url)

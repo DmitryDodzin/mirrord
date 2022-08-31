@@ -1,5 +1,5 @@
 use envconfig::Envconfig;
-use mirrord_preview::FilterPorts;
+use mirrord_preview::filter::FilterPorts;
 
 #[derive(Envconfig, Clone)]
 pub struct LayerConfig {
@@ -50,9 +50,6 @@ pub struct LayerConfig {
     /// Enables resolving a remote DNS.
     #[envconfig(from = "MIRRORD_REMOTE_DNS", default = "false")]
     pub remote_dns: bool,
-
-    #[envconfig(from = "MIRRORD_AUTH_TOKEN", default = "")]
-    pub auth_token: String,
 
     #[envconfig(from = "MIRRORD_PREVIEW", default = "false")]
     pub preview: bool,

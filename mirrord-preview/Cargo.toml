@@ -14,15 +14,21 @@ publish.workspace = true
 edition.workspace = true
 
 [features]
-default = ["client"]
-client = ["dep:tokio-stream", "dep:tracing", "dep:async-stream"]
+default = []
+client = [
+  "dep:async-stream",
+  "dep:tokio-stream",
+  "dep:tracing"
+]
 
 [dependencies]
+mirrord-auth = { path="../mirrord-auth" }
+
 async-stream = { version = "0.3", optional = true }
 bincode =  { version = "2.0.0-rc.1" }
-thiserror.workspace = true
-tracing = { workspace = true, optional = true }
 http = "0.2"
+thiserror.workspace = true
 reqwest =  { workspace = true, features = ["stream"] }
 tokio.workspace = true
 tokio-stream = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }

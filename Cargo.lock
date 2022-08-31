@@ -1535,6 +1535,7 @@ dependencies = [
  "async-stream",
  "bincode",
  "http",
+ "mirrord-auth",
  "reqwest",
  "thiserror",
  "tokio",
