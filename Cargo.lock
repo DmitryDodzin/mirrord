@@ -1534,7 +1534,6 @@ version = "2.9.1"
 dependencies = [
  "async-stream",
  "bincode",
- "bytes",
  "http",
  "reqwest",
  "thiserror",
