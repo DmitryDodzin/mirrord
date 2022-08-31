@@ -21,10 +21,14 @@ use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
 use mirrord_macro::hook_fn;
-use mirrord_preview::PreviewConfig;
+use mirrord_preview::{ConnectionStatus, PreviewConfig};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
+};
+use nix::{
+    sys::signal::{self, Signal},
+    unistd::Pid,
 };
 use rand::Rng;
 use socket::SOCKETS;
@@ -393,11 +397,24 @@ async fn start_preview_connection(config: LayerConfig) {
     match connection {
         Ok(mut status) => {
             while let Some(status) = status.recv().await {
-                info!("{:?}", status);
+                trace!("start_preview_connection -> status {:?}", status);
+
+                match status {
+                    ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
+                    ConnectionStatus::Error(err) => {
+                        error!("start_preview_connection -> status error {}", err);
+
+                        let _ =
+                            signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
+                    }
+                    _ => {}
+                }
             }
         }
         Err(err) => {
-            panic!("{:?}", err)
+            error!("start_preview_connection -> {}", err);
+
+            let _ = signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
         }
     };
 }
