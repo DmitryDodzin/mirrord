@@ -451,23 +451,14 @@ async fn start_preview_connection(
 
             match err {
                 ConnectionError::Authentication(err) => match err {
-                    AuthenticationError::IoError(err) => {
+                    AuthenticationError::IoError(_) => {
                         println!(
-                            r"
-                                mirrord could not open authentication file
-                                please make sure it exists by running 'mirrod login'
-
-                                error: {}
-                            ",
-                            err
+                            "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
                         );
                     }
                     AuthenticationError::ConfigParseError(_) => {
                         println!(
-                            r"
-                                mirrod authentication file is malformd,
-                                please run 'mirrod login' to update authentication file
-                            "
+                            "mirrord-layer encountered an issue:\n\nAuthentication file is malformd,\n  please run 'mirrord login' to update authentication file.\n"
                         );
                     }
                     _ => {}
