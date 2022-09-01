@@ -3,11 +3,12 @@
 #![feature(result_option_inspect)]
 #![feature(const_trait_impl)]
 #![feature(naked_functions)]
+#![feature(result_flattening)]
+#![feature(io_error_uncategorized)]
+#![feature(let_chains)]
 
 use std::{
-    cell::RefCell,
     collections::{HashSet, VecDeque},
-    ops::Deref,
     sync::{LazyLock, OnceLock},
 };
 
@@ -20,7 +21,7 @@ use frida_gum::{interceptor::Interceptor, Gum};
 use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
-use mirrord_macro::hook_fn;
+use mirrord_macro::hook_guard_fn;
 use mirrord_preview::{connection::ConnectionStatus, PreviewConfig};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
@@ -32,8 +33,9 @@ use nix::{
 };
 use rand::Rng;
 use socket::SOCKETS;
-use tcp::TcpHandler;
+use tcp::{outgoing::TcpOutgoingHandler, TcpHandler};
 use tcp_mirror::TcpMirrorHandler;
+use tcp_steal::TcpStealHandler;
 use tokio::{
     runtime::Runtime,
     select,
@@ -43,87 +45,37 @@ use tokio::{
 use tracing::{debug, error, info, trace};
 use tracing_subscriber::prelude::*;
 
+use crate::{common::HookMessage, config::LayerConfig, file::FileHandler};
+
 mod common;
 mod config;
+mod detour;
 mod error;
 mod file;
+mod go_env;
 mod go_hooks;
 mod macros;
 mod pod_api;
 mod socket;
 mod tcp;
 mod tcp_mirror;
+mod tcp_steal;
 
-use crate::{common::HookMessage, config::LayerConfig, file::FileHandler};
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .on_thread_start(detour_bypass_on)
-        .on_thread_stop(detour_bypass_off)
+        .on_thread_start(detour::detour_bypass_on)
+        .on_thread_stop(detour::detour_bypass_off)
         .build()
         .unwrap()
 });
+
 static GUM: LazyLock<Gum> = LazyLock::new(|| unsafe { Gum::obtain() });
 
-pub static mut HOOK_SENDER: Option<Sender<HookMessage>> = None;
-pub static ENABLED_FILE_OPS: OnceLock<bool> = OnceLock::new();
+pub(crate) static mut HOOK_SENDER: Option<Sender<HookMessage>> = None;
 
-thread_local!(pub(crate) static DETOUR_BYPASS: RefCell<bool> = RefCell::new(false));
-
-fn detour_bypass_on() {
-    DETOUR_BYPASS.with(|enabled| *enabled.borrow_mut() = true);
-}
-
-fn detour_bypass_off() {
-    DETOUR_BYPASS.with(|enabled| *enabled.borrow_mut() = false);
-}
-
-pub(crate) struct DetourGuard;
-
-impl DetourGuard {
-    /// Create a new DetourGuard if it's not already enabled.
-    pub(crate) fn new() -> Option<Self> {
-        DETOUR_BYPASS.with(|enabled| {
-            if *enabled.borrow() {
-                None
-            } else {
-                *enabled.borrow_mut() = true;
-                Some(Self)
-            }
-        })
-    }
-}
-
-impl Drop for DetourGuard {
-    fn drop(&mut self) {
-        detour_bypass_off();
-    }
-}
-
-/// Wrapper around `std::sync::OnceLock`, mainly used for the `Deref` implementation to simplify
-/// calls to the original functions as `FN_ORIGINAL()`, instead of `FN_ORIGINAL.get().unwrap()`.
-#[derive(Debug)]
-pub(crate) struct HookFn<T>(std::sync::OnceLock<T>);
-
-impl<T> Deref for HookFn<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.get().unwrap()
-    }
-}
-
-impl<T> const Default for HookFn<T> {
-    fn default() -> Self {
-        Self(std::sync::OnceLock::new())
-    }
-}
-
-impl<T> HookFn<T> {
-    pub(crate) fn set(&self, value: T) -> std::result::Result<(), T> {
-        self.0.set(value)
-    }
-}
+pub(crate) static ENABLED_FILE_OPS: OnceLock<bool> = OnceLock::new();
+pub(crate) static ENABLED_TCP_OUTGOING: OnceLock<bool> = OnceLock::new();
 
 #[ctor]
 fn init() {
@@ -157,6 +109,7 @@ fn init() {
         };
 
         let enabled_file_ops = ENABLED_FILE_OPS.get_or_init(|| config.enabled_file_ops);
+        let _ = ENABLED_TCP_OUTGOING.get_or_init(|| config.enabled_tcp_outgoing);
         enable_hooks(*enabled_file_ops, config.remote_dns);
 
         RUNTIME.block_on(start_layer_thread(
@@ -175,6 +128,7 @@ where
     pub codec: actix_codec::Framed<T, ClientCodec>,
     ping: bool,
     tcp_mirror_handler: TcpMirrorHandler,
+    tcp_outgoing_handler: TcpOutgoingHandler,
     // TODO: Starting to think about a better abstraction over this whole mess. File operations are
     // pretty much just `std::fs::File` things, so I think the best approach would be to create
     // a `FakeFile`, and implement `std::io` traits on it.
@@ -186,29 +140,48 @@ where
     // Stores a list of `oneshot`s that communicates with the hook side (send a message from -layer
     // to -agent, and when we receive a message from -agent to -layer).
     getaddrinfo_handler_queue: VecDeque<ResponseChannel<Vec<AddrInfoInternal>>>,
+
+    pub tcp_steal_handler: TcpStealHandler,
+
+    steal: bool,
 }
 
 impl<T> Layer<T>
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send,
 {
-    fn new(codec: actix_codec::Framed<T, ClientCodec>) -> Layer<T> {
+    fn new(codec: actix_codec::Framed<T, ClientCodec>, steal: bool) -> Layer<T> {
         Self {
             codec,
             ping: false,
             tcp_mirror_handler: TcpMirrorHandler::default(),
+            tcp_outgoing_handler: TcpOutgoingHandler::default(),
             file_handler: FileHandler::default(),
             getaddrinfo_handler_queue: VecDeque::new(),
+            tcp_steal_handler: TcpStealHandler::default(),
+            steal,
         }
     }
 
     async fn handle_hook_message(&mut self, hook_message: HookMessage) {
+        trace!(
+            "Layer::handle_hook_message -> hook_message {:?}",
+            hook_message
+        );
+
         match hook_message {
             HookMessage::Tcp(message) => {
-                self.tcp_mirror_handler
-                    .handle_hook_message(message, &mut self.codec)
-                    .await
-                    .unwrap();
+                if self.steal {
+                    self.tcp_steal_handler
+                        .handle_hook_message(message, &mut self.codec)
+                        .await
+                        .unwrap();
+                } else {
+                    self.tcp_mirror_handler
+                        .handle_hook_message(message, &mut self.codec)
+                        .await
+                        .unwrap();
+                }
             }
             HookMessage::File(message) => {
                 self.file_handler
@@ -234,6 +207,11 @@ where
 
                 self.codec.send(request).await.unwrap();
             }
+            HookMessage::TcpOutgoing(message) => self
+                .tcp_outgoing_handler
+                .handle_hook_message(message, &mut self.codec)
+                .await
+                .unwrap(),
         }
     }
 
@@ -242,7 +220,15 @@ where
             DaemonMessage::Tcp(message) => {
                 self.tcp_mirror_handler.handle_daemon_message(message).await
             }
+            DaemonMessage::TcpSteal(message) => {
+                self.tcp_steal_handler.handle_daemon_message(message).await
+            }
             DaemonMessage::File(message) => self.file_handler.handle_daemon_message(message).await,
+            DaemonMessage::TcpOutgoing(message) => {
+                self.tcp_outgoing_handler
+                    .handle_daemon_message(message)
+                    .await
+            }
             DaemonMessage::Pong => {
                 if self.ping {
                     self.ping = false;
@@ -277,12 +263,20 @@ async fn thread_loop(
         impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send,
         ClientCodec,
     >,
+    steal: bool,
 ) {
-    let mut layer = Layer::new(codec);
+    let mut layer = Layer::new(codec, steal);
     loop {
         select! {
             hook_message = receiver.recv() => {
                 layer.handle_hook_message(hook_message.unwrap()).await;
+            }
+            Some(outgoing_message) = layer.tcp_outgoing_handler.recv() => {
+                if let Err(fail) =
+                    layer.codec.send(ClientMessage::TcpOutgoing(outgoing_message)).await {
+                        error!("Error sending client message: {:#?}", fail);
+                        break;
+                    }
             }
             daemon_message = layer.codec.next() => {
                 match daemon_message {
@@ -297,11 +291,15 @@ async fn thread_loop(
                         error!("Error receiving daemon message: {:?}", err);
                         break;
                     }
+
                     None => {
                         error!("agent disconnected");
                         break;
                     }
                 }
+            },
+            Some(message) = layer.tcp_steal_handler.next() => {
+                layer.codec.send(message).await.unwrap();
             },
             _ = sleep(Duration::from_secs(60)) => {
                 if !layer.ping {
@@ -368,10 +366,10 @@ async fn start_layer_thread(
             } else {
                 panic!("unexpected response - expected env vars response {msg:?}");
             }
-        }
+        };
     }
 
-    let _ = tokio::spawn(thread_loop(receiver, codec));
+    let _ = tokio::spawn(thread_loop(receiver, codec, config.agent_tcp_steal_traffic));
 }
 
 /// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
@@ -433,42 +431,45 @@ fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
     if enabled_file_ops {
         unsafe { file::hooks::enable_file_hooks(&mut interceptor) };
     }
+    let modules = frida_gum::Module::enumerate_modules();
+    let binary = &modules.first().unwrap().name;
+
+    go_env::enable_go_env(&mut interceptor, binary);
     #[cfg(target_os = "linux")]
     #[cfg(target_arch = "x86_64")]
     {
-        let modules = frida_gum::Module::enumerate_modules();
-        let binary = &modules.first().unwrap().name;
         go_hooks::hooks::enable_socket_hooks(&mut interceptor, binary, enabled_file_ops);
     }
+
     interceptor.end_transaction();
 }
 
+// TODO: When this is annotated with `hook_guard_fn`, then the outgoing sockets never call it (we
+// just bypass). Everything works, so, should we intervene?
+//
 /// Attempts to close on a managed `Socket`, if there is no socket with `fd`, then this means we
 /// either let the `fd` bypass and call `libc::close` directly, or it might be a managed file `fd`,
 /// so it tries to do the same for files.
-#[hook_fn]
+#[hook_guard_fn]
 unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
+    trace!("close_detour -> fd {:#?}", fd);
+
     let enabled_file_ops = ENABLED_FILE_OPS
         .get()
         .expect("Should be set during initialization!");
 
     if SOCKETS.lock().unwrap().remove(&fd).is_some() {
         FN_CLOSE(fd)
-    } else if *enabled_file_ops {
-        let remote_fd = OPEN_FILES.lock().unwrap().remove(&fd);
+    } else if *enabled_file_ops
+        && let Some(remote_fd) = OPEN_FILES.lock().unwrap().remove(&fd) {
+        let close_file_result = file::ops::close(remote_fd);
 
-        if let Some(remote_fd) = remote_fd {
-            let close_file_result = file::ops::close(remote_fd);
-
-            close_file_result
-                .map_err(|fail| {
-                    error!("Failed writing file with {fail:#?}");
-                    -1
-                })
-                .unwrap_or_else(|fail| fail)
-        } else {
-            FN_CLOSE(fd)
-        }
+        close_file_result
+            .map_err(|fail| {
+                error!("Failed writing file with {fail:#?}");
+                -1
+            })
+            .unwrap_or_else(|fail| fail)
     } else {
         FN_CLOSE(fd)
     }

@@ -30,6 +30,9 @@ pub struct LayerConfig {
     #[envconfig(from = "MIRRORD_AGENT_TTL", default = "0")]
     pub agent_ttl: u16,
 
+    #[envconfig(from = "MIRRORD_AGENT_TCP_STEAL_TRAFFIC", default = "false")]
+    pub agent_tcp_steal_traffic: bool,
+
     #[envconfig(from = "MIRRORD_AGENT_COMMUNICATION_TIMEOUT")]
     pub agent_communication_timeout: Option<u16>,
 
@@ -51,6 +54,9 @@ pub struct LayerConfig {
     #[envconfig(from = "MIRRORD_REMOTE_DNS", default = "false")]
     pub remote_dns: bool,
 
+    #[envconfig(from = "MIRRORD_TCP_OUTGOING", default = "false")]
+    pub enabled_tcp_outgoing: bool,
+    
     #[envconfig(from = "MIRRORD_PREVIEW", default = "false")]
     pub preview: bool,
 
@@ -68,4 +74,5 @@ pub struct LayerConfig {
 
     #[envconfig(from = "MIRRORD_PREVIEW_DENY_PORTS")]
     pub preview_deny_ports: Option<FilterPorts>,
+
 }

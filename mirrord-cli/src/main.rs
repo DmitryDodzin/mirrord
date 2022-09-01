@@ -141,6 +141,14 @@ fn exec(args: &ExecArgs) -> Result<()> {
         std::env::set_var("MIRRORD_EPHEMERAL_CONTAINER", "true");
     };
 
+    if args.tcp_steal {
+        std::env::set_var("MIRRORD_AGENT_TCP_STEAL_TRAFFIC", "true");
+    };
+
+    if args.enable_tcp_outgoing {
+        std::env::set_var("MIRRORD_TCP_OUTGOING", true.to_string());
+    }
+
     let library_path = extract_library(args.extract_path.clone())?;
     add_to_preload(library_path.to_str().unwrap()).unwrap();
 
@@ -152,6 +160,7 @@ fn exec(args: &ExecArgs) -> Result<()> {
     Err(anyhow!("Failed to execute binary"))
 }
 
+#[allow(dead_code)]
 fn login(args: LoginArgs) -> Result<()> {
     match &args.token {
         Some(token) => AuthConfig::from_input(token)?.save()?,
@@ -204,7 +213,7 @@ fn main() -> Result<()> {
         Commands::Extract { path } => {
             extract_library(Some(path))?;
         }
-        Commands::Login(args) => login(args)?,
+        // Commands::Login(args) => login(args)?,
         Commands::Preview(args) => preview(&args)?,
     }
     Ok(())

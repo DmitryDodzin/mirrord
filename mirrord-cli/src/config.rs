@@ -15,7 +15,7 @@ pub(super) enum Commands {
         #[clap(value_parser)]
         path: String,
     },
-    Login(LoginArgs),
+    // Login(LoginArgs),
 }
 
 #[derive(Args, Debug)]
@@ -83,6 +83,14 @@ pub(super) struct ExecArgs {
     /// Use an Ephemeral Container to mirror traffic.
     #[clap(short, long, value_parser)]
     pub ephemeral_container: bool,
+
+    /// Steal TCP instead of mirroring
+    #[clap(long, value_parser)]
+    pub tcp_steal: bool,
+
+    /// Enable tcp outgoing feature.
+    #[clap(short = 'o', long, value_parser)]
+    pub enable_tcp_outgoing: bool,
 }
 
 
