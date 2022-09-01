@@ -1521,6 +1521,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "libc",
+ "mirrord-auth",
  "mirrord-macro",
  "mirrord-preview",
  "mirrord-protocol",

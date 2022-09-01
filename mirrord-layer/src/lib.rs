@@ -21,8 +21,13 @@ use frida_gum::{interceptor::Interceptor, Gum};
 use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
+use mirrord_auth::AuthenticationError;
 use mirrord_macro::hook_guard_fn;
-use mirrord_preview::{client::UpdateMessage, connection::ConnectionStatus, PreviewConfig};
+use mirrord_preview::{
+    client::UpdateMessage,
+    connection::{ConnectionError, ConnectionStatus},
+    PreviewConfig,
+};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
@@ -443,6 +448,32 @@ async fn start_preview_connection(
         }
         Err(err) => {
             error!("start_preview_connection -> {}", err);
+
+            match err {
+                ConnectionError::Authentication(err) => match err {
+                    AuthenticationError::IoError(err) => {
+                        println!(
+                            r"
+                                mirrord could not open authentication file
+                                please make sure it exists by running 'mirrod login'
+
+                                error: {}
+                            ",
+                            err
+                        );
+                    }
+                    AuthenticationError::ConfigParseError(_) => {
+                        println!(
+                            r"
+                                mirrod authentication file is malformd,
+                                please run 'mirrod login' to update authentication file
+                            "
+                        );
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
 
             let _ = signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
         }
