@@ -38,6 +38,7 @@ pub async fn connect(config: PreviewConfig) -> Result<Receiver<ConnectionStatus>
         .header(AUTHORIZATION, &auth_header)
         .send()
         .await?
+        .error_for_status()?
         .bytes()
         .await?;
 
@@ -81,6 +82,7 @@ async fn handle_inbound(
         .header(AUTHORIZATION, config.auth_header)
         .send()
         .await
+        .and_then(|res| res.error_for_status())
         .map(|res| res.bytes_stream())
     {
         Ok(mut stream) => {
@@ -150,6 +152,7 @@ async fn handle_outbound(config: ConnectionConfig, mut out_rx: Receiver<ProxiedR
         .body(Body::wrap_stream(stream))
         .send()
         .await
+        .and_then(|res| res.error_for_status())
     {
         let _ = config
             .status_tx

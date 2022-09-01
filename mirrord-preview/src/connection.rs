@@ -19,7 +19,7 @@ pub enum ConnectionError {
     ProxiedRequestDropped(#[from] SendError<ProxiedRequest>),
     #[error("response failed to send {0}")]
     ProxiedResponseDropped(#[from] SendError<ProxiedResponse>),
-    #[error(transparent)]
+    #[error("could not load authentication {0}")]
     Authentication(#[from] mirrord_auth::AuthenticationError),
 }
 
