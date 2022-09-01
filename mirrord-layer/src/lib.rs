@@ -96,7 +96,11 @@ fn init() {
     let (preview_update_tx, preview_update_rx) = channel(100);
 
     if config.preview {
-        RUNTIME.spawn(start_preview_connection(config.clone(), preview_update_rx));
+        RUNTIME.spawn(start_preview_connection(
+            config.clone(),
+            preview_update_rx,
+            config.impersonated_pod_name.is_some(),
+        ));
     }
 
     if config.impersonated_pod_name.is_some() {
@@ -410,6 +414,7 @@ async fn start_layer_thread(
 async fn start_preview_connection(
     config: LayerConfig,
     preview_update_receiver: Receiver<UpdateMessage>,
+    listen_for_updates: bool,
 ) {
     let LayerConfig {
         preview_server: server,
@@ -424,6 +429,7 @@ async fn start_preview_connection(
         username,
         allow_ports,
         deny_ports: deny_ports.unwrap_or_default(),
+        listen_for_updates,
     };
 
     let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;

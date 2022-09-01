@@ -10,4 +10,5 @@ pub struct PreviewConfig {
     pub username: Option<String>,
     pub allow_ports: Option<filter::FilterPorts>,
     pub deny_ports: filter::FilterPorts,
+    pub listen_for_updates: bool,
 }

@@ -231,7 +231,7 @@ async fn wrap_connection(
                     .await
                     .map_err(|err| error!("wrap_connection -> error {}", err));
             },
-            Some(update) = update_rx.recv() => {
+            Some(update) = update_rx.recv(), if config.listen_for_updates => {
                 trace!("wrap_connection -> update {:?}", update);
 
                 match update {
@@ -239,6 +239,10 @@ async fn wrap_connection(
                         port_remapper.write().await.insert(source, target);
                     }
                 }
+
+            }
+            else => {
+                break;
             }
         }
     }
