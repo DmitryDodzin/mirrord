@@ -8,8 +8,8 @@
 #![feature(let_chains)]
 
 use std::{
-    collections::{HashSet, VecDeque},
-    sync::{LazyLock, OnceLock},
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, LazyLock, OnceLock, RwLock},
 };
 
 use common::{GetAddrInfoHook, ResponseChannel};
@@ -45,7 +45,7 @@ use tokio::{
 use tracing::{debug, error, info, trace};
 use tracing_subscriber::prelude::*;
 
-use crate::{common::HookMessage, config::LayerConfig, file::FileHandler};
+use crate::{common::HookMessage, config::LayerConfig, file::FileHandler, tcp::HookMessageTcp};
 
 mod common;
 mod config;
@@ -88,8 +88,13 @@ fn init() {
 
     let config = LayerConfig::init_from_env().unwrap();
 
+    let port_remapper = Arc::new(RwLock::new(HashMap::new()));
+
     if config.preview {
-        RUNTIME.spawn(start_preview_connection(config.clone()));
+        RUNTIME.spawn(start_preview_connection(
+            config.clone(),
+            port_remapper.clone(),
+        ));
     }
 
     if config.impersonated_pod_name.is_some() {
@@ -117,6 +122,7 @@ fn init() {
             receiver,
             config,
             connection_port,
+            port_remapper,
         ));
     }
 }
@@ -144,13 +150,19 @@ where
     pub tcp_steal_handler: TcpStealHandler,
 
     steal: bool,
+
+    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
 }
 
 impl<T> Layer<T>
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send,
 {
-    fn new(codec: actix_codec::Framed<T, ClientCodec>, steal: bool) -> Layer<T> {
+    fn new(
+        codec: actix_codec::Framed<T, ClientCodec>,
+        steal: bool,
+        port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+    ) -> Layer<T> {
         Self {
             codec,
             ping: false,
@@ -160,6 +172,7 @@ where
             getaddrinfo_handler_queue: VecDeque::new(),
             tcp_steal_handler: TcpStealHandler::default(),
             steal,
+            port_remapper,
         }
     }
 
@@ -171,6 +184,14 @@ where
 
         match hook_message {
             HookMessage::Tcp(message) => {
+                // TODO remove allow when more HookMessageTcp message types are added
+                #[allow(irrefutable_let_patterns)]
+                if let HookMessageTcp::Listen(ref listen) = message {
+                    if let Ok(mut guard) = self.port_remapper.write() {
+                        guard.insert(listen.requested_port.into(), listen.mirror_port.into());
+                    }
+                }
+
                 if self.steal {
                     self.tcp_steal_handler
                         .handle_hook_message(message, &mut self.codec)
@@ -264,8 +285,9 @@ async fn thread_loop(
         ClientCodec,
     >,
     steal: bool,
+    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
 ) {
-    let mut layer = Layer::new(codec, steal);
+    let mut layer = Layer::new(codec, steal, port_remapper);
     loop {
         select! {
             hook_message = receiver.recv() => {
@@ -319,6 +341,7 @@ async fn start_layer_thread(
     receiver: Receiver<HookMessage>,
     config: LayerConfig,
     connection_port: u16,
+    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
 ) {
     let port = pf.take_stream(connection_port).unwrap(); // TODO: Make port configurable
 
@@ -369,11 +392,19 @@ async fn start_layer_thread(
         };
     }
 
-    let _ = tokio::spawn(thread_loop(receiver, codec, config.agent_tcp_steal_traffic));
+    let _ = tokio::spawn(thread_loop(
+        receiver,
+        codec,
+        config.agent_tcp_steal_traffic,
+        port_remapper,
+    ));
 }
 
 /// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
-async fn start_preview_connection(config: LayerConfig) {
+async fn start_preview_connection(
+    config: LayerConfig,
+    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+) {
     let LayerConfig {
         preview_server: server,
         preview_username: username,
@@ -387,6 +418,7 @@ async fn start_preview_connection(config: LayerConfig) {
         username,
         allow_ports,
         deny_ports: deny_ports.unwrap_or_default(),
+        port_remapper,
     };
 
     let connection = mirrord_preview::client::connect(config).await;

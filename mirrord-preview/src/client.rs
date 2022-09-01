@@ -174,7 +174,7 @@ async fn wrap_connection(
 
     let client = reqwest::Client::new();
 
-    while let Some(req) = rx.recv().await {
+    while let Some(mut req) = rx.recv().await {
         let request_id = req.request_id;
 
         let response = if config
@@ -184,6 +184,12 @@ async fn wrap_connection(
             .unwrap_or(true)
             && !config.deny_ports.is_match(req.port)
         {
+            if let Ok(remapper) = config.port_remapper.read() {
+                if let Some(remapped_port) = remapper.get(&req.port) {
+                    req.port = *remapped_port;
+                }
+            }
+
             let payload = handle_proxied_message(&client, req).await;
 
             ProxiedResponse {
