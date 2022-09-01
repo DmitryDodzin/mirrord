@@ -8,8 +8,8 @@
 #![feature(let_chains)]
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::{Arc, LazyLock, OnceLock, RwLock},
+    collections::{HashSet, VecDeque},
+    sync::{LazyLock, OnceLock},
 };
 
 use common::{GetAddrInfoHook, ResponseChannel};
@@ -22,7 +22,7 @@ use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
 use mirrord_macro::hook_guard_fn;
-use mirrord_preview::{connection::ConnectionStatus, PreviewConfig};
+use mirrord_preview::{client::UpdateMessage, connection::ConnectionStatus, PreviewConfig};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
@@ -88,13 +88,10 @@ fn init() {
 
     let config = LayerConfig::init_from_env().unwrap();
 
-    let port_remapper = Arc::new(RwLock::new(HashMap::new()));
+    let (preview_update_tx, preview_update_rx) = channel(100);
 
     if config.preview {
-        RUNTIME.spawn(start_preview_connection(
-            config.clone(),
-            port_remapper.clone(),
-        ));
+        RUNTIME.spawn(start_preview_connection(config.clone(), preview_update_rx));
     }
 
     if config.impersonated_pod_name.is_some() {
@@ -122,7 +119,7 @@ fn init() {
             receiver,
             config,
             connection_port,
-            port_remapper,
+            preview_update_tx,
         ));
     }
 }
@@ -151,7 +148,7 @@ where
 
     steal: bool,
 
-    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+    preview_update_sender: Sender<UpdateMessage>,
 }
 
 impl<T> Layer<T>
@@ -161,7 +158,7 @@ where
     fn new(
         codec: actix_codec::Framed<T, ClientCodec>,
         steal: bool,
-        port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+        preview_update_sender: Sender<UpdateMessage>,
     ) -> Layer<T> {
         Self {
             codec,
@@ -172,7 +169,7 @@ where
             getaddrinfo_handler_queue: VecDeque::new(),
             tcp_steal_handler: TcpStealHandler::default(),
             steal,
-            port_remapper,
+            preview_update_sender,
         }
     }
 
@@ -184,11 +181,15 @@ where
 
         match hook_message {
             HookMessage::Tcp(message) => {
-                // TODO remove allow when more HookMessageTcp message types are added
-                #[allow(irrefutable_let_patterns)]
-                if let HookMessageTcp::Listen(ref listen) = message {
-                    if let Ok(mut guard) = self.port_remapper.write() {
-                        guard.insert(listen.requested_port.into(), listen.mirror_port.into());
+                match message {
+                    HookMessageTcp::Listen(ref listen) => {
+                        let _ = self
+                            .preview_update_sender
+                            .send(UpdateMessage::PortRemap(
+                                listen.requested_port.into(),
+                                listen.mirror_port.into(),
+                            ))
+                            .await;
                     }
                 }
 
@@ -285,9 +286,9 @@ async fn thread_loop(
         ClientCodec,
     >,
     steal: bool,
-    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+    preview_update_sender: Sender<UpdateMessage>,
 ) {
-    let mut layer = Layer::new(codec, steal, port_remapper);
+    let mut layer = Layer::new(codec, steal, preview_update_sender);
     loop {
         select! {
             hook_message = receiver.recv() => {
@@ -341,7 +342,7 @@ async fn start_layer_thread(
     receiver: Receiver<HookMessage>,
     config: LayerConfig,
     connection_port: u16,
-    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+    preview_update_sender: Sender<UpdateMessage>,
 ) {
     let port = pf.take_stream(connection_port).unwrap(); // TODO: Make port configurable
 
@@ -396,14 +397,14 @@ async fn start_layer_thread(
         receiver,
         codec,
         config.agent_tcp_steal_traffic,
-        port_remapper,
+        preview_update_sender,
     ));
 }
 
 /// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
 async fn start_preview_connection(
     config: LayerConfig,
-    port_remapper: Arc<RwLock<HashMap<u32, u32>>>,
+    preview_update_receiver: Receiver<UpdateMessage>,
 ) {
     let LayerConfig {
         preview_server: server,
@@ -418,10 +419,9 @@ async fn start_preview_connection(
         username,
         allow_ports,
         deny_ports: deny_ports.unwrap_or_default(),
-        port_remapper,
     };
 
-    let connection = mirrord_preview::client::connect(config).await;
+    let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;
 
     match connection {
         Ok(mut status) => {

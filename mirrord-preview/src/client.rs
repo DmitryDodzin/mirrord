@@ -2,7 +2,10 @@ use std::{collections::HashMap, convert::Infallible};
 
 use mirrord_auth::AuthConfig;
 use reqwest::{header::AUTHORIZATION, Body, Method};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
+};
 use tokio_stream::StreamExt;
 use tracing::{error, trace};
 
@@ -19,7 +22,15 @@ struct ConnectionConfig {
     status_tx: Sender<ConnectionStatus>,
 }
 
-pub async fn connect(config: PreviewConfig) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
+#[derive(Debug)]
+pub enum UpdateMessage {
+    PortRemap(u32, u32),
+}
+
+pub async fn connect(
+    config: PreviewConfig,
+    update_rx: Receiver<UpdateMessage>,
+) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
     let auth_config = AuthConfig::load()?;
 
     let (out_tx, out_rx) = mpsc::channel(100);
@@ -63,7 +74,7 @@ pub async fn connect(config: PreviewConfig) -> Result<Receiver<ConnectionStatus>
 
     tokio::spawn(handle_outbound(connection_config, out_rx));
 
-    tokio::spawn(wrap_connection(out_tx, in_rx, config));
+    tokio::spawn(wrap_connection(out_tx, in_rx, config, update_rx));
 
     Ok(status_rx)
 }
@@ -169,51 +180,67 @@ async fn wrap_connection(
     tx: Sender<ProxiedResponse>,
     mut rx: Receiver<ProxiedRequest>,
     config: PreviewConfig,
+    mut update_rx: Receiver<UpdateMessage>,
 ) {
     trace!("wrap_connection -> config {:?}", config);
 
     let client = reqwest::Client::new();
 
-    while let Some(mut req) = rx.recv().await {
-        let request_id = req.request_id;
+    let port_remapper = RwLock::new(HashMap::new());
 
-        let response = if config
-            .allow_ports
-            .as_ref()
-            .map(|list| list.is_match(req.port))
-            .unwrap_or(true)
-            && !config.deny_ports.is_match(req.port)
-        {
-            if let Ok(remapper) = config.port_remapper.read() {
-                if let Some(remapped_port) = remapper.get(&req.port) {
-                    req.port = *remapped_port;
+    loop {
+        tokio::select! {
+            Some(mut req) = rx.recv() => {
+                trace!("wrap_connection -> request_id {:?}", req.request_id);
+
+                let request_id = req.request_id;
+
+                let response = if config
+                    .allow_ports
+                    .as_ref()
+                    .map(|list| list.is_match(req.port))
+                    .unwrap_or(true)
+                    && !config.deny_ports.is_match(req.port)
+                {
+                    if let Some(remapped_port) = port_remapper.read().await.get(&req.port) {
+                        req.port = *remapped_port;
+                    }
+
+                    let payload = handle_proxied_message(&client, req).await;
+
+                    ProxiedResponse {
+                        request_id,
+                        payload,
+                    }
+                } else {
+                    let payload = HttpPayload {
+                        headers: HashMap::new(),
+                        body: b"Not Allowed Port".to_vec(),
+                    };
+
+                    ProxiedResponse {
+                        request_id,
+                        payload: Ok((401, payload)),
+                    }
+                };
+
+                trace!("wrap_connection -> response {:?}", response);
+
+                let _ = tx
+                    .send(response)
+                    .await
+                    .map_err(|err| error!("wrap_connection -> error {}", err));
+            },
+            Some(update) = update_rx.recv() => {
+                trace!("wrap_connection -> update {:?}", update);
+
+                match update {
+                    UpdateMessage::PortRemap(source, target) => {
+                        port_remapper.write().await.insert(source, target);
+                    }
                 }
             }
-
-            let payload = handle_proxied_message(&client, req).await;
-
-            ProxiedResponse {
-                request_id,
-                payload,
-            }
-        } else {
-            let payload = HttpPayload {
-                headers: HashMap::new(),
-                body: b"Not Allowed Port".to_vec(),
-            };
-
-            ProxiedResponse {
-                request_id,
-                payload: Ok((401, payload)),
-            }
-        };
-
-        trace!("wrap_connection -> response {:?}", response);
-
-        let _ = tx
-            .send(response)
-            .await
-            .map_err(|err| error!("wrap_connection -> error {}", err));
+        }
     }
 }
 
