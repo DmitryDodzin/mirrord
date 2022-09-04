@@ -122,8 +122,9 @@ impl AuthConfig {
             .get(format!("{}/oauth/verify", server))
             .bearer_auth(self.access_token.secret())
             .send()?
-            .json()
-            .map_err(|err| err.into())
+            .error_for_status()?;
+
+        Ok(())
     }
 
     pub async fn verify_async(&self, server: &str) -> Result<()> {
@@ -134,9 +135,9 @@ impl AuthConfig {
             .bearer_auth(self.access_token.secret())
             .send()
             .await?
-            .json()
-            .await
-            .map_err(|err| err.into())
+            .error_for_status()?;
+
+        Ok(())
     }
 
     pub fn from_input(token: &str) -> Result<Self> {
