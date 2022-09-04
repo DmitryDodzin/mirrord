@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::Infallible};
 
 use mirrord_auth::AuthConfig;
-use reqwest::{header::AUTHORIZATION, Body, Method};
+use reqwest::{Body, Method};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     RwLock,
@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Clone)]
 struct ConnectionConfig {
-    auth_header: String,
+    auth_config: AuthConfig,
     listen_url: String,
     status_tx: Sender<ConnectionStatus>,
 }
@@ -58,11 +58,9 @@ pub async fn connect(
         None => config.server.clone(),
     };
 
-    let auth_header = auth_config.header();
-
     let register_bytes = reqwest::Client::new()
         .get(&request_url)
-        .header(AUTHORIZATION, &auth_header)
+        .bearer_auth(auth_config.access_token.secret())
         .send()
         .await?
         .error_for_status()?
@@ -81,7 +79,7 @@ pub async fn connect(
     );
 
     let connection_config = ConnectionConfig {
-        auth_header,
+        auth_config,
         status_tx,
         listen_url: format!("{}/{}/{}", config.server, register.user, register.uid),
     };
@@ -106,7 +104,7 @@ async fn handle_inbound(
 
     match client
         .get(config.listen_url)
-        .header(AUTHORIZATION, config.auth_header)
+        .bearer_auth(config.auth_config.access_token.secret())
         .send()
         .await
         .and_then(|res| res.error_for_status())
@@ -175,7 +173,7 @@ async fn handle_outbound(config: ConnectionConfig, mut out_rx: Receiver<ProxiedR
 
     if let Err(err) = client
         .post(&config.listen_url)
-        .header(AUTHORIZATION, config.auth_header)
+        .bearer_auth(config.auth_config.access_token.secret())
         .body(Body::wrap_stream(stream))
         .send()
         .await

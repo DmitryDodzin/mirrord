@@ -10,7 +10,7 @@ use std::{
 
 #[cfg(feature = "webbrowser")]
 use rand::distributions::{Alphanumeric, DistString};
-use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -36,7 +36,7 @@ static AUTH_FILE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         .unwrap_or_else(|| HOME_DIR.to_path_buf())
 });
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuthConfig {
     pub access_token: SecretToken,
     pub refresh_token: Option<SecretToken>,
@@ -73,10 +73,6 @@ impl AuthConfig {
         fs::write(AUTH_FILE_DIR.as_path(), bytes)?;
 
         Ok(())
-    }
-
-    pub fn header(&self) -> String {
-        format!("Bearer {}", self.access_token.secret())
     }
 
     pub fn refresh(&self, server: &str) -> Result<AuthConfig> {
@@ -124,7 +120,7 @@ impl AuthConfig {
 
         client
             .get(format!("{}/oauth/verify", server))
-            .header(AUTHORIZATION, self.header())
+            .bearer_auth(self.access_token.secret())
             .send()?
             .json()
             .map_err(|err| err.into())
@@ -135,7 +131,7 @@ impl AuthConfig {
 
         client
             .get(format!("{}/oauth/verify", server))
-            .header(AUTHORIZATION, self.header())
+            .bearer_auth(self.access_token.secret())
             .send()
             .await?
             .json()

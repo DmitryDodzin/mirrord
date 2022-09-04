@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct SecretToken(String);
 
