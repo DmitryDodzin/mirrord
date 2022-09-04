@@ -93,7 +93,6 @@ pub(super) struct ExecArgs {
     pub enable_tcp_outgoing: bool,
 }
 
-
 #[derive(Args, Debug)]
 pub(super) struct LoginArgs {
     /// Manualy insert token
@@ -118,6 +117,10 @@ pub(super) struct PreviewArgs {
     /// Override Preview Server Connection
     #[clap(long, value_parser)]
     pub server: Option<String>,
+
+    /// Override identity server url
+    #[clap(long)]
+    pub auth_server: Option<String>,
 
     /// Override Username for Preview Server
     #[clap(long, value_parser)]

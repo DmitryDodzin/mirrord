@@ -1495,7 +1495,6 @@ dependencies = [
 name = "mirrord-auth"
 version = "2.10.1"
 dependencies = [
- "lazy_static",
  "rand 0.8.5",
  "reqwest",
  "serde",

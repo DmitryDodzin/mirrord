@@ -31,7 +31,23 @@ pub async fn connect(
     config: PreviewConfig,
     update_rx: Receiver<UpdateMessage>,
 ) -> Result<Receiver<ConnectionStatus>, ConnectionError> {
-    let auth_config = AuthConfig::load()?;
+    let auth_config = {
+        let mut auth_config = AuthConfig::load()?;
+
+        if let Err(_) = auth_config.verify_async(&config.auth_server).await {
+            trace!(
+                "connect -> refresh_token -> auth_server {}",
+                &config.auth_server
+            );
+
+            auth_config = auth_config.refresh_async(&config.auth_server).await?;
+            auth_config.save()?;
+        }
+
+        trace!("connect -> auth_config {:?}", auth_config);
+
+        auth_config
+    };
 
     let (out_tx, out_rx) = mpsc::channel(100);
     let (in_tx, in_rx) = mpsc::channel(100);
@@ -42,7 +58,7 @@ pub async fn connect(
         None => config.server.clone(),
     };
 
-    let auth_header = format!("Bearer {}", auth_config.access_token);
+    let auth_header = auth_config.header();
 
     let register_bytes = reqwest::Client::new()
         .get(&request_url)

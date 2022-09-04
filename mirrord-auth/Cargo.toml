@@ -17,12 +17,11 @@ edition.workspace = true
 
 [features]
 default = []
-webbrowser = ["dep:rand", "dep:reqwest", "dep:webbrowser"]
+webbrowser = ["dep:rand", "dep:webbrowser"]
 
 [dependencies]
-lazy_static = "1"
 rand = { version = "0.8", optional = true }
-reqwest = { workspace = true, features=["json"], optional = true }
+reqwest = { workspace = true, features=["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true

@@ -1,35 +1,45 @@
+#![feature(once_cell)]
+
 #[cfg(feature = "webbrowser")]
 use std::time::Duration;
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
-use lazy_static::lazy_static;
 #[cfg(feature = "webbrowser")]
 use rand::distributions::{Alphanumeric, DistString};
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-lazy_static! {
-    static ref HOME_DIR: PathBuf = [
+use crate::secret::SecretToken;
+
+mod secret;
+
+static HOME_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    [
         std::env::var("HOME")
             .or_else(|_| std::env::var("HOMEPATH"))
             .unwrap_or_else(|_| "~".to_owned()),
-        ".metalbear_credentials".to_owned()
+        ".metalbear_credentials".to_owned(),
     ]
     .iter()
-    .collect();
-    static ref AUTH_FILE_DIR: PathBuf = std::env::var("MIRRORD_AUTHENTICATION")
+    .collect()
+});
+
+static AUTH_FILE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    std::env::var("MIRRORD_AUTHENTICATION")
         .ok()
         .and_then(|val| val.parse().ok())
-        .unwrap_or_else(|| HOME_DIR.to_path_buf());
-}
+        .unwrap_or_else(|| HOME_DIR.to_path_buf())
+});
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AuthConfig {
-    pub access_token: String,
-    pub refresh_token: Option<String>,
+    pub access_token: SecretToken,
+    pub refresh_token: Option<SecretToken>,
 }
 
 #[derive(Error, Debug)]
@@ -39,8 +49,9 @@ pub enum AuthenticationError {
     #[error(transparent)]
     ConfigParseError(#[from] serde_json::Error),
     #[error(transparent)]
-    #[cfg(feature = "webbrowser")]
     ConfigRequestError(#[from] reqwest::Error),
+    #[error("missing refresh token in credentials")]
+    MissingRefresh,
 }
 
 type Result<T> = std::result::Result<T, AuthenticationError>;
@@ -64,14 +75,79 @@ impl AuthConfig {
         Ok(())
     }
 
+    pub fn header(&self) -> String {
+        format!("Bearer {}", self.access_token.secret())
+    }
+
+    pub fn refresh(&self, server: &str) -> Result<AuthConfig> {
+        let refresh_token = self
+            .refresh_token
+            .as_ref()
+            .ok_or(AuthenticationError::MissingRefresh)?;
+
+        let client = reqwest::blocking::Client::new();
+
+        client
+            .post(format!("{}/oauth/refresh", server))
+            .body(format!("\"{}\"", refresh_token.secret()))
+            .header(ACCEPT, "application/json")
+            .header(CONTENT_TYPE, "application/json")
+            .send()?
+            .error_for_status()?
+            .json()
+            .map_err(|err| err.into())
+    }
+
+    pub async fn refresh_async(&self, server: &str) -> Result<AuthConfig> {
+        let refresh_token = self
+            .refresh_token
+            .as_ref()
+            .ok_or(AuthenticationError::MissingRefresh)?;
+
+        let client = reqwest::Client::new();
+
+        client
+            .post(format!("{}/oauth/refresh", server))
+            .body(format!("\"{}\"", refresh_token.secret()))
+            .header(ACCEPT, "application/json")
+            .header(CONTENT_TYPE, "application/json")
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(|err| err.into())
+    }
+
+    pub fn verify(&self, server: &str) -> Result<()> {
+        let client = reqwest::blocking::Client::new();
+
+        client
+            .get(format!("{}/oauth/verify", server))
+            .header(AUTHORIZATION, self.header())
+            .send()?
+            .json()
+            .map_err(|err| err.into())
+    }
+
+    pub async fn verify_async(&self, server: &str) -> Result<()> {
+        let client = reqwest::Client::new();
+
+        client
+            .get(format!("{}/oauth/verify", server))
+            .header(AUTHORIZATION, self.header())
+            .send()
+            .await?
+            .json()
+            .await
+            .map_err(|err| err.into())
+    }
+
     pub fn from_input(token: &str) -> Result<Self> {
         let mut parts = token.split(':');
 
-        let access_token = parts
-            .next()
-            .map(|val| val.to_owned())
-            .expect("Invalid Token");
-        let refresh_token = parts.next().map(|val| val.to_owned());
+        let access_token = parts.next().map(|val| val.into()).expect("Invalid Token");
+        let refresh_token = parts.next().map(|val| val.into());
 
         Ok(AuthConfig {
             access_token,

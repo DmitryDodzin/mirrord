@@ -56,7 +56,7 @@ pub struct LayerConfig {
 
     #[envconfig(from = "MIRRORD_TCP_OUTGOING", default = "false")]
     pub enabled_tcp_outgoing: bool,
-    
+
     #[envconfig(from = "MIRRORD_PREVIEW", default = "false")]
     pub preview: bool,
 
@@ -66,6 +66,12 @@ pub struct LayerConfig {
     )]
     pub preview_server: String,
 
+    #[envconfig(
+        from = "MIRRORD_PREVIEW_AUTH_SERVER",
+        default = "https://identity.metalbear.dev"
+    )]
+    pub preview_auth_server: String,
+
     #[envconfig(from = "MIRRORD_PREVIEW_USERNAME")]
     pub preview_username: Option<String>,
 
@@ -74,5 +80,4 @@ pub struct LayerConfig {
 
     #[envconfig(from = "MIRRORD_PREVIEW_DENY_PORTS")]
     pub preview_deny_ports: Option<FilterPorts>,
-
 }

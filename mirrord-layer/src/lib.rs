@@ -417,6 +417,7 @@ async fn start_preview_connection(
     listen_for_updates: bool,
 ) {
     let LayerConfig {
+        preview_auth_server: auth_server,
         preview_server: server,
         preview_username: username,
         preview_allow_ports: allow_ports,
@@ -425,6 +426,7 @@ async fn start_preview_connection(
     } = config;
 
     let config = PreviewConfig {
+        auth_server,
         server,
         username,
         allow_ports,

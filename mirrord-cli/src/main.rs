@@ -184,6 +184,10 @@ fn preview(args: &PreviewArgs) -> Result<()> {
         std::env::set_var("MIRRORD_PREVIEW_SERVER", server.as_str());
     }
 
+    if let Some(auth_server) = &args.auth_server {
+        std::env::set_var("MIRRORD_PREVIEW_AUTH_SERVER", auth_server.as_str());
+    }
+
     if let Some(username) = &args.username {
         std::env::set_var("MIRRORD_PREVIEW_USERNAME", username.as_str());
     }
