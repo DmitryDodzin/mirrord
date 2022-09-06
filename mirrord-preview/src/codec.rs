@@ -4,25 +4,27 @@ use actix_codec::{Decoder, Encoder};
 use bincode::{error::DecodeError, Decode, Encode};
 use bytes::{Buf, BufMut, BytesMut};
 
-pub struct BincodeCodec<T> {
+pub struct BincodeCodec<E, D = E> {
     config: bincode::config::Configuration,
-    _t: PhantomData<T>,
+    _encode: PhantomData<E>,
+    _decode: PhantomData<D>,
 }
 
-impl<T> Default for BincodeCodec<T> {
+impl<E, D> Default for BincodeCodec<E, D> {
     fn default() -> Self {
         BincodeCodec {
             config: bincode::config::standard(),
-            _t: PhantomData::<T>,
+            _encode: PhantomData::<E>,
+            _decode: PhantomData::<D>,
         }
     }
 }
 
-impl<T> Decoder for BincodeCodec<T>
+impl<E, D> Decoder for BincodeCodec<E, D>
 where
-    T: Decode,
+    D: Decode,
 {
-    type Item = T;
+    type Item = D;
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -37,13 +39,13 @@ where
     }
 }
 
-impl<T> Encoder<T> for BincodeCodec<T>
+impl<E, D> Encoder<E> for BincodeCodec<E, D>
 where
-    T: Encode,
+    E: Encode,
 {
     type Error = io::Error;
 
-    fn encode(&mut self, payload: T, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, payload: E, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let encoded = match bincode::encode_to_vec(payload, self.config) {
             Ok(encoded) => encoded,
             Err(err) => {

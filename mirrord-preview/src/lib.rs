@@ -15,5 +15,5 @@ pub struct PreviewConfig {
     pub listen_for_updates: bool,
 }
 
-pub type RequestCodec = codec::BincodeCodec<proxy::ProxiedRequest>;
-pub type ResponseCodec = codec::BincodeCodec<proxy::ProxiedResponse>;
+pub type ClientCodec = codec::BincodeCodec<proxy::ProxiedResponse, proxy::ProxiedRequest>;
+pub type ServerCodec = codec::BincodeCodec<proxy::ProxiedRequest, proxy::ProxiedResponse>;
