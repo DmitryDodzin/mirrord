@@ -1552,8 +1552,10 @@ dependencies = [
 name = "mirrord-preview"
 version = "2.10.1"
 dependencies = [
+ "actix-codec",
  "async-stream",
  "bincode",
+ "bytes",
  "http",
  "mirrord-auth",
  "reqwest",
