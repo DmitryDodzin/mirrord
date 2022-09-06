@@ -1,6 +1,6 @@
 use std::{io, marker::PhantomData};
 
-use actix_codec::{Decoder, Encoder};
+pub use actix_codec::*;
 use bincode::{error::DecodeError, Decode, Encode};
 use bytes::{Buf, BufMut, BytesMut};
 
