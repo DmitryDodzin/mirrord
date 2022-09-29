@@ -1,4 +1,7 @@
-use std::io;
+use std::{
+    io,
+    net::{AddrParseError, SocketAddr},
+};
 
 use bincode::{Decode, Encode};
 use thiserror::Error;
@@ -19,6 +22,35 @@ pub enum ResponseError {
 
     #[error("IO failed for remote operation with `{0}!")]
     RemoteIO(RemoteIOError),
+
+    #[error("DNS resolve failed with return code`{0}`")]
+    DnsFailure(i32),
+
+    #[error("Remote operation failed with `{0}`")]
+    Remote(#[from] RemoteError),
+}
+
+#[derive(Encode, Decode, Debug, PartialEq, Clone, Eq, Error)]
+pub enum RemoteError {
+    #[error("Failed to find a nameserver when resolving DNS!")]
+    NameserverNotFound,
+
+    #[error("Failed parsing address into a `SocketAddr` with `{0}`!")]
+    AddressParsing(String),
+
+    #[error("Failed operation to `SocketAddr` with `{0}`!")]
+    InvalidAddress(SocketAddr),
+
+    /// Especially relevant for the outgoing traffic feature, when `golang` attempts to connect
+    /// on both IPv6 and IPv4.
+    #[error("Connect call to `SocketAddr` `{0}` timed out!")]
+    ConnectTimedOut(SocketAddr),
+}
+
+impl From<AddrParseError> for RemoteError {
+    fn from(fail: AddrParseError) -> Self {
+        Self::AddressParsing(fail.to_string())
+    }
 }
 
 /// Our internal version of Rust's `std::io::Error` that can be passed between mirrord-layer and
@@ -36,6 +68,12 @@ impl From<io::Error> for ResponseError {
             raw_os_error: io_error.raw_os_error(),
             kind: From::from(io_error.kind()),
         })
+    }
+}
+
+impl From<dns_lookup::LookupError> for ResponseError {
+    fn from(error: dns_lookup::LookupError) -> Self {
+        Self::DnsFailure(error.error_num())
     }
 }
 

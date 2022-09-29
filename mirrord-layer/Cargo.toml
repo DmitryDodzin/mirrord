@@ -16,6 +16,7 @@ edition.workspace = true
 
 [dependencies]
 mirrord-auth = { path = "../mirrord-auth" }
+mirrord-config = { path = "../mirrord-config"}
 mirrord-macro = { path = "../mirrord-macro" }
 mirrord-preview = { path = "../mirrord-preview", features = ["client"] }
 mirrord-protocol = { path = "../mirrord-protocol" }
@@ -40,7 +41,6 @@ tokio-util.workspace = true
 thiserror.workspace = true
 dns-lookup.workspace = true
 rand = "0.8"
-envconfig = "0.10"
 regex = "1"
 errno = "0.2"
 async-trait = "0.1"
@@ -48,6 +48,10 @@ socket2 = "0.4"
 anyhow.workspace = true
 streammap-ext.workspace = true
 stacker = "0.1"
+
+
+[dev-dependencies]
+rstest = "*"
 
 [lib]
 crate_type = ["cdylib"]

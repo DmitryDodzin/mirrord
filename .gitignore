@@ -1,13 +1,20 @@
 out
 dist
 node_modules
+__pycache__
 .vscode-test/
 *.vsix
 .DS_Store
 **/.DS_Store
 target
+
+### go tests ###
 tests/go-e2e/go-e2e
+tests/go-e2e-env/go-e2e-env
 tests/go-e2e-fileops/go-e2e-fileops
+tests/go-e2e-outgoing/go-e2e-outgoing
+tests/go-e2e-dns/go-e2e-dns
+
 ### VSCode ###
 .vscode/*
 !.vscode/settings.json
@@ -21,3 +28,4 @@ intellij-ext/.idea
 intellij-ext/.qodana
 intellij-ext/build
 intellij-ext/libmirrord_layer.*
+.idea/

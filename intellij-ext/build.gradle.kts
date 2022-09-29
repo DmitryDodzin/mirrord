@@ -9,7 +9,7 @@ plugins {
     // Kotlin support
     id("org.jetbrains.kotlin.jvm") version "1.6.10"
     // Gradle IntelliJ Plugin
-    id("org.jetbrains.intellij") version "1.8.1"
+    id("org.jetbrains.intellij") version "1.9.0"
     // Gradle Changelog Plugin
     id("org.jetbrains.changelog") version "1.3.1"
     // Gradle Qodana Plugin
@@ -25,7 +25,8 @@ repositories {
 }
 dependencies {
     implementation("io.kubernetes:client-java:16.0.0") {
-        exclude(group="org.slf4j", module = "slf4j-api")
+        exclude(group = "org.slf4j", module = "slf4j-api")
+        exclude(group = "org.yaml", module = "snakeyaml")
     }
 }
 
@@ -82,18 +83,18 @@ tasks {
     }
 
     prepareSandbox {
-        doLast {
-            copy {
-                from(file("$projectDir/libmirrord_layer.dylib"))
-                into(file("$buildDir/idea-sandbox/config"))
+        val sharedLibs =
+            mapOf("macos" to "$projectDir/libmirrord_layer.dylib", "linux" to "$projectDir/libmirrord_layer.so")
+        sharedLibs.forEach { (_, lib) ->
+            from(file(lib)) {
+                into(pluginName.get())
             }
-            copy {
-                from(file("$projectDir/libmirrord_layer.so"))
-                into(file("$buildDir/idea-sandbox/config"))
-            }
+            // NOTE: comment this line when developing locally without either of shared libs
+           if (!System.getenv("CI_BUILD_PLUGIN").toBoolean()) {
+               if (!inputs.sourceFiles.files.contains(File(lib))) throw StopExecutionException("Expected library: $lib >> Not Found")
+           }
         }
     }
-
     // Configure UI tests plugin
     // Read more: https://github.com/JetBrains/intellij-ui-test-robot
     runIdeForUiTests {

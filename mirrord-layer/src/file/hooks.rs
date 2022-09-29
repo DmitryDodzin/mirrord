@@ -3,8 +3,8 @@ use std::{ffi::CStr, io::SeekFrom, os::unix::io::RawFd, path::PathBuf, ptr, slic
 use frida_gum::interceptor::Interceptor;
 use libc::{self, c_char, c_int, c_void, off_t, size_t, ssize_t, AT_EACCESS, AT_FDCWD, FILE};
 use mirrord_macro::hook_guard_fn;
-use mirrord_protocol::ReadFileResponse;
-use tracing::{error, trace};
+use mirrord_protocol::{OpenOptionsInternal, ReadFileResponse};
+use tracing::error;
 
 use super::{
     ops::{fdopen, fopen, openat},
@@ -13,7 +13,7 @@ use super::{
 use crate::{
     error::HookError,
     file::ops::{access, lseek, open, read, write},
-    replace,
+    replace, ENABLED_FILE_RO_OPS,
 };
 
 /// Hook for `libc::open`.
@@ -21,12 +21,11 @@ use crate::{
 /// **Bypassed** by `raw_path`s that match `IGNORE_FILES` regex.
 #[hook_guard_fn]
 pub(super) unsafe extern "C" fn open_detour(raw_path: *const c_char, open_flags: c_int) -> RawFd {
-    trace!("open_detour -> open_flags {:#?}", open_flags);
-
     open_logic(raw_path, open_flags)
 }
 
 /// Implementation of open_detour, used in open_detour and openat_detour
+#[tracing::instrument(level = "trace", skip(raw_path))]
 unsafe fn open_logic(raw_path: *const c_char, open_flags: c_int) -> RawFd {
     let path = match CStr::from_ptr(raw_path)
         .to_str()
@@ -41,7 +40,13 @@ unsafe fn open_logic(raw_path: *const c_char, open_flags: c_int) -> RawFd {
     if IGNORE_FILES.is_match(path.to_str().unwrap_or_default()) || !path.is_absolute() {
         FN_OPEN(raw_path, open_flags)
     } else {
-        let open_options = OpenOptionsInternalExt::from_flags(open_flags);
+        let open_options: OpenOptionsInternal = OpenOptionsInternalExt::from_flags(open_flags);
+        let read_only = ENABLED_FILE_RO_OPS
+            .get()
+            .expect("Should be set during initialization!");
+        if *read_only && !open_options.is_read_only() {
+            return FN_OPEN(raw_path, open_flags);
+        }
         let open_result = open(path, open_options);
 
         let (Ok(result) | Err(result)) = open_result.map_err(From::from);
@@ -53,12 +58,11 @@ unsafe fn open_logic(raw_path: *const c_char, open_flags: c_int) -> RawFd {
 ///
 /// **Bypassed** by `raw_path`s that match `IGNORE_FILES` regex.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(raw_path, raw_mode))]
 pub(super) unsafe extern "C" fn fopen_detour(
     raw_path: *const c_char,
     raw_mode: *const c_char,
 ) -> *mut FILE {
-    trace!("fopen_detour ->");
-
     let path = match CStr::from_ptr(raw_path)
         .to_str()
         .map_err(HookError::from)
@@ -80,7 +84,14 @@ pub(super) unsafe extern "C" fn fopen_detour(
     if IGNORE_FILES.is_match(path.to_str().unwrap()) || !path.is_absolute() {
         FN_FOPEN(raw_path, raw_mode)
     } else {
-        let open_options = OpenOptionsInternalExt::from_mode(mode);
+        let open_options: OpenOptionsInternal = OpenOptionsInternalExt::from_mode(mode);
+
+        let read_only = ENABLED_FILE_RO_OPS
+            .get()
+            .expect("Should be set during initialization!");
+        if *read_only && !open_options.is_read_only() {
+            return FN_FOPEN(raw_path, raw_mode);
+        }
         let fopen_result = fopen(path, open_options);
 
         let (Ok(result) | Err(result)) = fopen_result.map_err(From::from);
@@ -93,9 +104,8 @@ pub(super) unsafe extern "C" fn fopen_detour(
 /// Converts a `RawFd` into `*mut FILE` only for files that are already being managed by
 /// mirrord-layer.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(raw_mode))]
 pub(super) unsafe extern "C" fn fdopen_detour(fd: RawFd, raw_mode: *const c_char) -> *mut FILE {
-    trace!("fdopen_detour -> fd {:#?}", fd);
-
     let mode = match CStr::from_ptr(raw_mode)
         .to_str()
         .map(String::from)
@@ -110,6 +120,7 @@ pub(super) unsafe extern "C" fn fdopen_detour(fd: RawFd, raw_mode: *const c_char
 
     if let Some((local_fd, remote_fd)) = open_file {
         let open_options = OpenOptionsInternalExt::from_mode(mode);
+
         let fdopen_result = fdopen(local_fd, *remote_fd, open_options);
 
         let (Ok(result) | Err(result)) = fdopen_result.map_err(From::from);
@@ -125,17 +136,12 @@ pub(super) unsafe extern "C" fn fdopen_detour(fd: RawFd, raw_mode: *const c_char
 /// `open_detour`.
 /// `fd` for a file descriptor with the `O_DIRECTORY` flag.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(raw_path))]
 pub(crate) unsafe extern "C" fn openat_detour(
     fd: RawFd,
     raw_path: *const c_char,
     open_flags: c_int,
 ) -> RawFd {
-    trace!(
-        "openat_detour -> fd {:#?} | open_flags {:#?}",
-        fd,
-        open_flags
-    );
-
     let path = match CStr::from_ptr(raw_path)
         .to_str()
         .map_err(HookError::from)
@@ -173,13 +179,12 @@ pub(crate) unsafe extern "C" fn openat_detour(
 ///
 /// Reads `count` bytes into `out_buffer`, only for `fd`s that are being managed by mirrord-layer.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(out_buffer))]
 pub(crate) unsafe extern "C" fn read_detour(
     fd: RawFd,
     out_buffer: *mut c_void,
     count: size_t,
 ) -> ssize_t {
-    trace!("read_detour -> fd {:#?} | count {:#?}", fd, count);
-
     // We're only interested in files that are paired with mirrord-agent.
     let remote_fd = OPEN_FILES.lock().unwrap().get(&fd).cloned();
 
@@ -212,18 +217,13 @@ pub(crate) unsafe extern "C" fn read_detour(
 /// Reads `element_size * number_of_elements` bytes into `out_buffer`, only for `*mut FILE`s that
 /// are being managed by mirrord-layer.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(out_buffer, file_stream))]
 pub(crate) unsafe extern "C" fn fread_detour(
     out_buffer: *mut c_void,
     element_size: size_t,
     number_of_elements: size_t,
     file_stream: *mut FILE,
 ) -> size_t {
-    trace!(
-        "fread_detour -> element_size {:#?} | number_of_elements {:#?}",
-        element_size,
-        number_of_elements
-    );
-
     // Extract the fd from stream and check if it's managed by us, or should be bypassed.
     let fd = fileno_logic(file_stream);
 
@@ -258,12 +258,11 @@ pub(crate) unsafe extern "C" fn fread_detour(
 /// Converts a `*mut FILE` stream into an fd.
 #[hook_guard_fn]
 pub(crate) unsafe extern "C" fn fileno_detour(file_stream: *mut FILE) -> c_int {
-    trace!("fileno_detour ->");
-
     fileno_logic(file_stream)
 }
 
 /// Implementation of fileno_detour, used in fileno_detour and fread_detour
+#[tracing::instrument(level = "trace", skip(file_stream))]
 unsafe fn fileno_logic(file_stream: *mut FILE) -> c_int {
     let local_fd = *(file_stream as *const _);
 
@@ -278,14 +277,8 @@ unsafe fn fileno_logic(file_stream: *mut FILE) -> c_int {
 ///
 /// **Bypassed** by `fd`s that are not managed by us (not found in `OPEN_FILES`).
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace")]
 pub(crate) unsafe extern "C" fn lseek_detour(fd: RawFd, offset: off_t, whence: c_int) -> off_t {
-    trace!(
-        "lseek_detour -> fd {:#?} | offset {:#?} | whence {:#?}",
-        fd,
-        offset,
-        whence
-    );
-
     let remote_fd = OPEN_FILES.lock().unwrap().get(&fd).cloned();
 
     if let Some(remote_fd) = remote_fd {
@@ -320,8 +313,20 @@ pub(crate) unsafe extern "C" fn write_detour(
     buffer: *const c_void,
     count: size_t,
 ) -> ssize_t {
-    trace!("write_detour -> fd {:#?} | count {:#?}", fd, count);
+    if fd > 2 {
+        write_logic(fd, buffer, count)
+    } else {
+        FN_WRITE(fd, buffer, count)
+    }
+}
 
+/// Implementation of write_detour, used in  write_detour
+#[tracing::instrument(level = "trace", skip(buffer))]
+pub(crate) unsafe extern "C" fn write_logic(
+    fd: RawFd,
+    buffer: *const c_void,
+    count: size_t,
+) -> ssize_t {
     let remote_fd = OPEN_FILES.lock().unwrap().get(&fd).cloned();
 
     if let Some(remote_fd) = remote_fd {
@@ -346,12 +351,11 @@ pub(crate) unsafe extern "C" fn write_detour(
 /// Hook for `libc::access`.
 #[hook_guard_fn]
 pub(crate) unsafe extern "C" fn access_detour(raw_path: *const c_char, mode: c_int) -> c_int {
-    trace!("access_detour -> path {:#?} | mode {:#?}", raw_path, mode);
-
     access_logic(raw_path, mode)
 }
 
 /// Implementation of access_detour, used in access_detour and faccessat_detour
+#[tracing::instrument(level = "trace", skip(raw_path))]
 unsafe fn access_logic(raw_path: *const c_char, mode: c_int) -> c_int {
     let path = match CStr::from_ptr(raw_path)
         .to_str()
@@ -375,20 +379,13 @@ unsafe fn access_logic(raw_path: *const c_char, mode: c_int) -> c_int {
 
 /// Hook for `libc::faccessat`.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace", skip(pathname))]
 pub(crate) unsafe extern "C" fn faccessat_detour(
     dirfd: RawFd,
     pathname: *const c_char,
     mode: c_int,
     flags: c_int,
 ) -> c_int {
-    trace!(
-        "faccessat_detour -> dirfd {:#?} | pathname {:#?} | mode {:#?} | flags {:#?}",
-        dirfd,
-        pathname,
-        mode,
-        flags
-    );
-
     if dirfd == AT_FDCWD && (flags == AT_EACCESS || flags == 0) {
         access_logic(pathname, mode)
     } else {

@@ -9,36 +9,28 @@
 
 use std::{
     collections::{HashSet, VecDeque},
+    path::PathBuf,
     sync::{LazyLock, OnceLock},
 };
 
 use common::{GetAddrInfoHook, ResponseChannel};
 use ctor::ctor;
-use envconfig::Envconfig;
 use error::{LayerError, Result};
 use file::OPEN_FILES;
 use frida_gum::{interceptor::Interceptor, Gum};
 use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
-use mirrord_auth::AuthenticationError;
+use mirrord_config::{config::MirrordConfig, util::VecOrSingle, LayerConfig, LayerFileConfig};
 use mirrord_macro::hook_guard_fn;
-use mirrord_preview::{
-    client::UpdateMessage,
-    connection::{ConnectionError, ConnectionStatus},
-    PreviewConfig,
-};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
 };
-use nix::{
-    sys::signal::{self, Signal},
-    unistd::Pid,
-};
+use outgoing::{tcp::TcpOutgoingHandler, udp::UdpOutgoingHandler};
 use rand::Rng;
 use socket::SOCKETS;
-use tcp::{outgoing::TcpOutgoingHandler, TcpHandler};
+use tcp::TcpHandler;
 use tcp_mirror::TcpMirrorHandler;
 use tcp_steal::TcpStealHandler;
 use tokio::{
@@ -47,24 +39,27 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     time::{sleep, Duration},
 };
-use tracing::{debug, error, info, trace};
-use tracing_subscriber::prelude::*;
+use tracing::{error, info, trace};
+use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 
-use crate::{common::HookMessage, config::LayerConfig, file::FileHandler, tcp::HookMessageTcp};
+use crate::{common::HookMessage, file::FileHandler};
 
 mod common;
-mod config;
 mod detour;
 mod error;
 mod file;
 mod go_env;
-mod go_hooks;
 mod macros;
+mod outgoing;
 mod pod_api;
 mod socket;
 mod tcp;
 mod tcp_mirror;
 mod tcp_steal;
+
+#[cfg(target_os = "linux")]
+#[cfg(target_arch = "x86_64")]
+mod go_hooks;
 
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -80,56 +75,104 @@ static GUM: LazyLock<Gum> = LazyLock::new(|| unsafe { Gum::obtain() });
 pub(crate) static mut HOOK_SENDER: Option<Sender<HookMessage>> = None;
 
 pub(crate) static ENABLED_FILE_OPS: OnceLock<bool> = OnceLock::new();
+pub(crate) static ENABLED_FILE_RO_OPS: OnceLock<bool> = OnceLock::new();
 pub(crate) static ENABLED_TCP_OUTGOING: OnceLock<bool> = OnceLock::new();
+pub(crate) static ENABLED_UDP_OUTGOING: OnceLock<bool> = OnceLock::new();
 
 #[ctor]
-fn init() {
+fn before_init() {
+    if !cfg!(test) {
+        let args = std::env::args().collect::<Vec<_>>();
+        let given_process = args.first().unwrap().split('/').last().unwrap();
+
+        let config = std::env::var("MIRRORD_CONFIG_FILE")
+            .ok()
+            .and_then(|val| val.parse::<PathBuf>().ok())
+            .map(|path| {
+                LayerFileConfig::from_path(&path).expect("error parsing mirrord config file")
+            })
+            .unwrap_or_default()
+            .generate_config();
+
+        match config {
+            Ok(config) => {
+                let skip_processes = config.skip_processes.clone().map(VecOrSingle::to_vec);
+
+                if should_load(given_process, skip_processes) {
+                    init(config);
+                }
+            }
+            Err(err) => {
+                eprintln!("mirrord config error: {}", err);
+
+                std::process::exit(-1);
+            }
+        }
+    }
+}
+
+fn init(config: LayerConfig) {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_thread_ids(true)
+                .with_span_events(FmtSpan::ACTIVE),
+        )
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     info!("Initializing mirrord-layer!");
 
-    let config = LayerConfig::init_from_env().unwrap();
+    let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
 
-    let (preview_update_tx, preview_update_rx) = channel(100);
+    info!("Using port `{connection_port:?}` for communication");
 
-    if config.preview {
-        RUNTIME.spawn(start_preview_connection(
-            config.clone(),
-            preview_update_rx,
-            config.impersonated_pod_name.is_some(),
-        ));
-    }
+    let port_forwarder = RUNTIME
+        .block_on(pod_api::create_agent(config.clone(), connection_port))
+        .unwrap_or_else(|err| match err {
+            LayerError::KubeError(kube::Error::HyperError(err)) => {
+                eprintln!("\nmirrord encountered an error accessing the Kubernetes API. Consider passing --accept-invalid-certificates.\n");
 
-    if config.impersonated_pod_name.is_some() {
-        let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
+                match err.into_cause() {
+                    Some(cause) => panic!("{}", cause),
+                    None => panic!("mirrord got KubeError::HyperError"),
+                }
+            }
+            _ => panic!("failed to create agent: {}", err),
+        });
 
-        info!("Using port `{connection_port:?}` for communication");
+    let (sender, receiver) = channel::<HookMessage>(1000);
+    unsafe {
+        HOOK_SENDER = Some(sender);
+    };
 
-        let port_forwarder = RUNTIME
-            .block_on(pod_api::create_agent(config.clone(), connection_port))
-            .unwrap_or_else(|e| {
-                panic!("failed to create agent: {}", e);
-            });
+    let enabled_file_ops = ENABLED_FILE_OPS
+        .get_or_init(|| config.feature.fs.is_read() || config.feature.fs.is_write());
+    ENABLED_FILE_RO_OPS
+        .set(config.feature.fs.is_read())
+        .expect("Setting ENABLED_FILE_RO_OPS singleton");
+    ENABLED_TCP_OUTGOING
+        .set(config.feature.network.outgoing.tcp)
+        .expect("Setting ENABLED_TCP_OUTGOING singleton");
+    ENABLED_UDP_OUTGOING
+        .set(config.feature.network.outgoing.udp)
+        .expect("Setting ENABLED_UDP_OUTGOING singleton");
 
-        let (sender, receiver) = channel::<HookMessage>(1000);
-        unsafe {
-            HOOK_SENDER = Some(sender);
-        };
+    enable_hooks(*enabled_file_ops, config.feature.network.dns);
 
-        let enabled_file_ops = ENABLED_FILE_OPS.get_or_init(|| config.enabled_file_ops);
-        let _ = ENABLED_TCP_OUTGOING.get_or_init(|| config.enabled_tcp_outgoing);
-        enable_hooks(*enabled_file_ops, config.remote_dns);
+    RUNTIME.block_on(start_layer_thread(
+        port_forwarder,
+        receiver,
+        config,
+        connection_port,
+    ));
+}
 
-        RUNTIME.block_on(start_layer_thread(
-            port_forwarder,
-            receiver,
-            config,
-            connection_port,
-            preview_update_tx,
-        ));
+fn should_load(given_process: &str, skip_processes: Option<Vec<String>>) -> bool {
+    if let Some(processes_to_avoid) = skip_processes {
+        !processes_to_avoid.iter().any(|x| x == given_process)
+    } else {
+        true
     }
 }
 
@@ -141,6 +184,7 @@ where
     ping: bool,
     tcp_mirror_handler: TcpMirrorHandler,
     tcp_outgoing_handler: TcpOutgoingHandler,
+    udp_outgoing_handler: UdpOutgoingHandler,
     // TODO: Starting to think about a better abstraction over this whole mess. File operations are
     // pretty much just `std::fs::File` things, so I think the best approach would be to create
     // a `FakeFile`, and implement `std::io` traits on it.
@@ -156,52 +200,30 @@ where
     pub tcp_steal_handler: TcpStealHandler,
 
     steal: bool,
-
-    preview_update_sender: Sender<UpdateMessage>,
 }
 
 impl<T> Layer<T>
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send,
 {
-    fn new(
-        codec: actix_codec::Framed<T, ClientCodec>,
-        steal: bool,
-        preview_update_sender: Sender<UpdateMessage>,
-    ) -> Layer<T> {
+    fn new(codec: actix_codec::Framed<T, ClientCodec>, steal: bool) -> Layer<T> {
         Self {
             codec,
             ping: false,
             tcp_mirror_handler: TcpMirrorHandler::default(),
             tcp_outgoing_handler: TcpOutgoingHandler::default(),
+            udp_outgoing_handler: Default::default(),
             file_handler: FileHandler::default(),
             getaddrinfo_handler_queue: VecDeque::new(),
             tcp_steal_handler: TcpStealHandler::default(),
             steal,
-            preview_update_sender,
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn handle_hook_message(&mut self, hook_message: HookMessage) {
-        trace!(
-            "Layer::handle_hook_message -> hook_message {:?}",
-            hook_message
-        );
-
         match hook_message {
             HookMessage::Tcp(message) => {
-                match message {
-                    HookMessageTcp::Listen(ref listen) => {
-                        let _ = self
-                            .preview_update_sender
-                            .send(UpdateMessage::PortRemap(
-                                listen.requested_port.into(),
-                                listen.mirror_port.into(),
-                            ))
-                            .await;
-                    }
-                }
-
                 if self.steal {
                     self.tcp_steal_handler
                         .handle_hook_message(message, &mut self.codec)
@@ -226,8 +248,6 @@ where
                 hints,
                 hook_channel_tx,
             }) => {
-                trace!("HookMessage::GetAddrInfo");
-
                 self.getaddrinfo_handler_queue.push_back(hook_channel_tx);
 
                 let request = ClientMessage::GetAddrInfoRequest(GetAddrInfoRequest {
@@ -243,9 +263,15 @@ where
                 .handle_hook_message(message, &mut self.codec)
                 .await
                 .unwrap(),
+            HookMessage::UdpOutgoing(message) => self
+                .udp_outgoing_handler
+                .handle_hook_message(message, &mut self.codec)
+                .await
+                .unwrap(),
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn handle_daemon_message(&mut self, daemon_message: DaemonMessage) -> Result<()> {
         match daemon_message {
             DaemonMessage::Tcp(message) => {
@@ -257,6 +283,11 @@ where
             DaemonMessage::File(message) => self.file_handler.handle_daemon_message(message).await,
             DaemonMessage::TcpOutgoing(message) => {
                 self.tcp_outgoing_handler
+                    .handle_daemon_message(message)
+                    .await
+            }
+            DaemonMessage::UdpOutgoing(message) => {
+                self.udp_outgoing_handler
                     .handle_daemon_message(message)
                     .await
             }
@@ -273,15 +304,12 @@ where
             DaemonMessage::GetEnvVarsResponse(_) => {
                 unreachable!("We get env vars only on initialization right now, shouldn't happen")
             }
-            DaemonMessage::GetAddrInfoResponse(get_addr_info) => {
-                trace!("DaemonMessage::GetAddrInfoResponse {:#?}", get_addr_info);
-
-                self.getaddrinfo_handler_queue
-                    .pop_front()
-                    .ok_or(LayerError::SendErrorGetAddrInfoResponse)?
-                    .send(get_addr_info)
-                    .map_err(|_| LayerError::SendErrorGetAddrInfoResponse)
-            }
+            DaemonMessage::GetAddrInfoResponse(get_addr_info) => self
+                .getaddrinfo_handler_queue
+                .pop_front()
+                .ok_or(LayerError::SendErrorGetAddrInfoResponse)?
+                .send(get_addr_info)
+                .map_err(|_| LayerError::SendErrorGetAddrInfoResponse),
             DaemonMessage::Close => todo!(),
             DaemonMessage::LogMessage(_) => todo!(),
         }
@@ -295,17 +323,23 @@ async fn thread_loop(
         ClientCodec,
     >,
     steal: bool,
-    preview_update_sender: Sender<UpdateMessage>,
 ) {
-    let mut layer = Layer::new(codec, steal, preview_update_sender);
+    let mut layer = Layer::new(codec, steal);
     loop {
         select! {
             hook_message = receiver.recv() => {
                 layer.handle_hook_message(hook_message.unwrap()).await;
             }
-            Some(outgoing_message) = layer.tcp_outgoing_handler.recv() => {
+            Some(tcp_outgoing_message) = layer.tcp_outgoing_handler.recv() => {
                 if let Err(fail) =
-                    layer.codec.send(ClientMessage::TcpOutgoing(outgoing_message)).await {
+                    layer.codec.send(ClientMessage::TcpOutgoing(tcp_outgoing_message)).await {
+                        error!("Error sending client message: {:#?}", fail);
+                        break;
+                    }
+            }
+            Some(udp_outgoing_message) = layer.udp_outgoing_handler.recv() => {
+                if let Err(fail) =
+                    layer.codec.send(ClientMessage::UdpOutgoing(udp_outgoing_message)).await {
                         error!("Error sending client message: {:#?}", fail);
                         break;
                     }
@@ -346,12 +380,12 @@ async fn thread_loop(
     }
 }
 
+#[tracing::instrument(level = "trace", skip(pf, receiver))]
 async fn start_layer_thread(
     mut pf: Portforwarder,
     receiver: Receiver<HookMessage>,
     config: LayerConfig,
     connection_port: u16,
-    preview_update_sender: Sender<UpdateMessage>,
 ) {
     let port = pf.take_stream(connection_port).unwrap(); // TODO: Make port configurable
 
@@ -359,9 +393,11 @@ async fn start_layer_thread(
     // -layer)
     let mut codec = actix_codec::Framed::new(port, ClientCodec::new());
 
-    if !config.override_env_vars_exclude.is_empty() && !config.override_env_vars_include.is_empty()
-    {
-        panic!(
+    let (env_vars_filter, env_vars_select) = match (
+        config.feature.env.exclude.map(|exclude| exclude.join(";")),
+        config.feature.env.include.map(|include| include.join(";")),
+    ) {
+        (Some(_), Some(_)) => panic!(
             r#"mirrord-layer encountered an issue:
 
             mirrord doesn't support specifying both
@@ -369,117 +405,43 @@ async fn start_layer_thread(
 
             > Use either `--override_env_vars_exclude` or `--override_env_vars_include`.
             >> If you want to include all, use `--override_env_vars_include="*"`."#
-        );
-    } else {
-        let env_vars_filter = HashSet::from(EnvVars(config.override_env_vars_exclude));
-        let env_vars_select = HashSet::from(EnvVars(config.override_env_vars_include));
+        ),
+        (Some(exclude), None) => (HashSet::from(EnvVars(exclude)), HashSet::new()),
+        (None, Some(include)) => (HashSet::new(), HashSet::from(EnvVars(include))),
+        (None, None) => (HashSet::new(), HashSet::from(EnvVars("*".to_owned()))),
+    };
 
-        if !env_vars_filter.is_empty() || !env_vars_select.is_empty() {
-            // TODO: Handle this error. We're just ignoring it here and letting -layer crash later.
-            let _codec_result = codec
-                .send(ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
-                    env_vars_filter,
-                    env_vars_select,
-                }))
-                .await;
+    if !env_vars_filter.is_empty() || !env_vars_select.is_empty() {
+        // TODO: Handle this error. We're just ignoring it here and letting -layer crash later.
+        let _codec_result = codec
+            .send(ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
+                env_vars_filter,
+                env_vars_select,
+            }))
+            .await;
 
-            let msg = codec.next().await;
-            if let Some(Ok(DaemonMessage::GetEnvVarsResponse(Ok(remote_env_vars)))) = msg {
-                debug!("DaemonMessage::GetEnvVarsResponse {:#?}!", remote_env_vars);
+        let msg = codec.next().await;
+        if let Some(Ok(DaemonMessage::GetEnvVarsResponse(Ok(remote_env_vars)))) = msg {
+            trace!("DaemonMessage::GetEnvVarsResponse {:#?}!", remote_env_vars);
 
-                for (key, value) in remote_env_vars.into_iter() {
-                    debug!(
-                        "DaemonMessage::GetEnvVarsResponse set key {:#?} value {:#?}",
-                        key, value
-                    );
-
-                    std::env::set_var(&key, &value);
-                    debug_assert_eq!(std::env::var(key), Ok(value));
-                }
-            } else {
-                panic!("unexpected response - expected env vars response {msg:?}");
+            for (key, value) in remote_env_vars.into_iter() {
+                std::env::set_var(&key, &value);
+                debug_assert_eq!(std::env::var(key), Ok(value));
             }
-        };
-    }
+        } else {
+            panic!("unexpected response - expected env vars response {msg:?}");
+        }
+    };
 
     let _ = tokio::spawn(thread_loop(
         receiver,
         codec,
-        config.agent_tcp_steal_traffic,
-        preview_update_sender,
+        config.feature.network.incoming.is_steal(),
     ));
 }
 
-/// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
-async fn start_preview_connection(
-    config: LayerConfig,
-    preview_update_receiver: Receiver<UpdateMessage>,
-    listen_for_updates: bool,
-) {
-    let LayerConfig {
-        preview_auth_server: auth_server,
-        preview_server: server,
-        preview_username: username,
-        preview_allow_ports: allow_ports,
-        preview_deny_ports: deny_ports,
-        ..
-    } = config;
-
-    let config = PreviewConfig {
-        auth_server,
-        server,
-        username,
-        allow_ports,
-        deny_ports: deny_ports.unwrap_or_default(),
-        listen_for_updates,
-    };
-
-    let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;
-
-    match connection {
-        Ok(mut status) => {
-            while let Some(status) = status.recv().await {
-                trace!("start_preview_connection -> status {:?}", status);
-
-                match status {
-                    ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
-                    ConnectionStatus::Error(err) => {
-                        error!("start_preview_connection -> status error {}", err);
-                    }
-                    ConnectionStatus::Disconnected => {
-                        let _ =
-                            signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        Err(err) => {
-            error!("start_preview_connection -> {}", err);
-
-            match err {
-                ConnectionError::Authentication(err) => match err {
-                    AuthenticationError::IoError(_) => {
-                        println!(
-                            "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
-                        );
-                    }
-                    AuthenticationError::ConfigParseError(_) => {
-                        println!(
-                            "mirrord-layer encountered an issue:\n\nAuthentication file is malformd,\n  please run 'mirrord login' to update authentication file.\n"
-                        );
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-
-            let _ = signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
-        }
-    };
-}
-
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.
+#[tracing::instrument(level = "trace")]
 fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
     let mut interceptor = Interceptor::obtain(&GUM);
     interceptor.begin_transaction();
@@ -500,7 +462,7 @@ fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
     #[cfg(target_os = "linux")]
     #[cfg(target_arch = "x86_64")]
     {
-        go_hooks::hooks::enable_socket_hooks(&mut interceptor, binary, enabled_file_ops);
+        go_hooks::enable_socket_hooks(&mut interceptor, binary);
     }
 
     interceptor.end_transaction();
@@ -513,9 +475,8 @@ fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
 /// either let the `fd` bypass and call `libc::close` directly, or it might be a managed file `fd`,
 /// so it tries to do the same for files.
 #[hook_guard_fn]
+#[tracing::instrument(level = "trace")]
 unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
-    trace!("close_detour -> fd {:#?}", fd);
-
     let enabled_file_ops = ENABLED_FILE_OPS
         .get()
         .expect("Should be set during initialization!");
@@ -534,5 +495,33 @@ unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
             .unwrap_or_else(|fail| fail)
     } else {
         FN_CLOSE(fd)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case("test", Some(vec!["foo".to_string()]))]
+    #[case("test", None)]
+    #[case("test", Some(vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()]))]
+    fn test_should_load_true(
+        #[case] given_process: &str,
+        #[case] skip_processes: Option<Vec<String>>,
+    ) {
+        assert!(should_load(given_process, skip_processes));
+    }
+
+    #[rstest]
+    #[case("test", Some(vec!["test".to_string()]))]
+    #[case("test", Some(vec!["test".to_owned(), "foo".to_owned(), "bar".to_owned(), "baz".to_owned()]))]
+    fn test_should_load_false(
+        #[case] given_process: &str,
+        #[case] skip_processes: Option<Vec<String>>,
+    ) {
+        assert!(!should_load(given_process, skip_processes));
     }
 }

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     io::{self, SeekFrom},
@@ -10,10 +11,11 @@ use bincode::{error::DecodeError, Decode, Encode};
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::{
-    tcp::{
-        outgoing::{DaemonTcpOutgoing, LayerTcpOutgoing},
-        DaemonTcp, LayerTcp, LayerTcpSteal,
+    outgoing::{
+        tcp::{DaemonTcpOutgoing, LayerTcpOutgoing},
+        udp::{DaemonUdpOutgoing, LayerUdpOutgoing},
     },
+    tcp::{DaemonTcp, LayerTcp, LayerTcpSteal},
     ResponseError,
 };
 
@@ -49,6 +51,12 @@ pub struct OpenOptionsInternal {
     pub truncate: bool,
     pub create: bool,
     pub create_new: bool,
+}
+
+impl OpenOptionsInternal {
+    pub fn is_read_only(&self) -> bool {
+        self.read && !(self.write || self.append || self.truncate || self.create || self.create_new)
+    }
 }
 
 impl From<OpenOptionsInternal> for std::fs::OpenOptions {
@@ -119,10 +127,19 @@ pub struct SeekFileRequest {
     pub seek_from: SeekFromInternal,
 }
 
-#[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone)]
 pub struct WriteFileRequest {
     pub fd: usize,
     pub write_bytes: Vec<u8>,
+}
+
+impl fmt::Debug for WriteFileRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WriteFileRequest")
+            .field("fd", &self.fd)
+            .field("write_bytes (length)", &self.write_bytes.len())
+            .finish()
+    }
 }
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -171,6 +188,7 @@ pub enum ClientMessage {
     Tcp(LayerTcp),
     TcpSteal(LayerTcpSteal),
     TcpOutgoing(LayerTcpOutgoing),
+    UdpOutgoing(LayerUdpOutgoing),
     FileRequest(FileRequest),
     GetEnvVarsRequest(GetEnvVarsRequest),
     Ping,
@@ -182,10 +200,19 @@ pub struct OpenFileResponse {
     pub fd: usize,
 }
 
-#[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone)]
 pub struct ReadFileResponse {
     pub bytes: Vec<u8>,
     pub read_amount: usize,
+}
+
+impl fmt::Debug for ReadFileResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReadFileResponse")
+            .field("bytes (length)", &self.bytes.len())
+            .field("read_amount", &self.read_amount)
+            .finish()
+    }
 }
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -278,6 +305,7 @@ pub enum DaemonMessage {
     Tcp(DaemonTcp),
     TcpSteal(DaemonTcp),
     TcpOutgoing(DaemonTcpOutgoing),
+    UdpOutgoing(DaemonUdpOutgoing),
     LogMessage(LogMessage),
     File(FileResponse),
     Pong,

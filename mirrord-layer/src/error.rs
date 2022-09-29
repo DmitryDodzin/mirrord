@@ -93,6 +93,9 @@ pub(crate) enum LayerError {
     #[error("mirrord-layer: Failed to get `Sender` for sending tcp response!")]
     SendErrorTcpResponse,
 
+    #[error("mirrord-layer: Failed to get `Sender` for sending udp response!")]
+    SendErrorUdpResponse,
+
     #[error("mirrord-layer: JoinError failed with `{0}`!")]
     Join(#[from] tokio::task::JoinError),
 
@@ -162,6 +165,25 @@ impl From<HookError> for i64 {
             | HookError::BypassedPort(_) => {
                 warn!("Recoverable issue >> {:#?}", fail)
             }
+            HookError::ResponseError(ResponseError::DnsFailure(code)) => {
+                use dns_lookup::{LookupError, LookupErrorKind};
+                error!("dns failed with code {}", code);
+                // Some of the codes of Unix doesn't match FreeBSD/macOS so we re-use the library
+                // to return valid codes.
+                let error = LookupError::new(code);
+                let code = match error.kind() {
+                    LookupErrorKind::IO => libc::EAI_SYSTEM,
+                    _ => error.error_num(),
+                };
+                return code.into();
+            }
+            HookError::ResponseError(ResponseError::NotFound(_))
+            | HookError::ResponseError(ResponseError::NotFile(_))
+            | HookError::ResponseError(ResponseError::NotDirectory(_))
+            | HookError::ResponseError(ResponseError::Remote(_))
+            | HookError::ResponseError(ResponseError::RemoteIO(_)) => {
+                error!("Error occured in Layer >> {:?}", fail)
+            }
             _ => error!("Error occured in Layer >> {:?}", fail),
         };
 
@@ -180,6 +202,12 @@ impl From<HookError> for i64 {
                 ResponseError::NotDirectory(_) => libc::ENOTDIR,
                 ResponseError::NotFile(_) => libc::EISDIR,
                 ResponseError::RemoteIO(io_fail) => io_fail.raw_os_error.unwrap_or(libc::EIO),
+                ResponseError::DnsFailure(_) => libc::EIO,
+                ResponseError::Remote(remote) => match remote {
+                    // So far only encountered when trying to make requests from golang.
+                    mirrord_protocol::RemoteError::ConnectTimedOut(_) => libc::ENETUNREACH,
+                    _ => libc::EINVAL,
+                },
             },
             HookError::DNSNoName => libc::EFAULT,
             HookError::Utf8(_) => libc::EINVAL,

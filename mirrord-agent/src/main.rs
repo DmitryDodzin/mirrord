@@ -1,5 +1,6 @@
 #![feature(result_option_inspect)]
 #![feature(hash_drain_filter)]
+#![feature(once_cell)]
 
 use std::{
     collections::{HashMap, HashSet},
@@ -9,6 +10,7 @@ use std::{
 
 use actix_codec::Framed;
 use cli::parse_args;
+use dns::{dns_worker, DnsRequest};
 use error::AgentError;
 use file::FileManager;
 use futures::{
@@ -17,11 +19,10 @@ use futures::{
 };
 use mirrord_protocol::{
     tcp::{DaemonTcp, LayerTcp, LayerTcpSteal},
-    AddrInfoHint, AddrInfoInternal, ClientMessage, DaemonCodec, DaemonMessage, GetAddrInfoRequest,
-    GetEnvVarsRequest, RemoteResult, ResponseError,
+    ClientMessage, DaemonCodec, DaemonMessage, GetEnvVarsRequest, RemoteResult,
 };
+use outgoing::{udp::UdpOutgoingApi, TcpOutgoingApi};
 use sniffer::{SnifferCommand, TCPConnectionSniffer, TCPSnifferAPI};
-use tcp::outgoing::TcpOutgoingApi;
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
@@ -30,7 +31,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace};
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 
 use crate::{
     runtime::get_container_pid,
@@ -39,28 +40,14 @@ use crate::{
 };
 
 mod cli;
+mod dns;
 mod error;
 mod file;
+mod outgoing;
 mod runtime;
 mod sniffer;
 mod steal;
-mod tcp;
 mod util;
-
-trait AddrInfoHintExt {
-    fn into_lookup(self) -> dns_lookup::AddrInfoHints;
-}
-
-impl AddrInfoHintExt for AddrInfoHint {
-    fn into_lookup(self) -> dns_lookup::AddrInfoHints {
-        dns_lookup::AddrInfoHints {
-            socktype: self.ai_socktype,
-            protocol: self.ai_protocol,
-            address: self.ai_family,
-            flags: self.ai_flags,
-        }
-    }
-}
 
 const CHANNEL_SIZE: usize = 1024;
 
@@ -122,7 +109,7 @@ async fn select_env_vars(
         // "DB=foo.db\0PORT=99\0HOST=\0PATH=/fake\0"
         .split_terminator(char::from(0))
         // ["DB=foo.db", "PORT=99", "HOST=", "PATH=/fake"]
-        .map(|key_and_value| key_and_value.split_terminator('=').collect::<Vec<_>>())
+        .map(|key_and_value| key_and_value.splitn(2, '=').collect::<Vec<_>>())
         // [["DB", "foo.db"], ["PORT", "99"], ["HOST"], ["PATH", "/fake"]]
         .filter_map(
             |mut keys_and_values| match (keys_and_values.pop(), keys_and_values.pop()) {
@@ -145,36 +132,6 @@ async fn select_env_vars(
     Ok(env_vars)
 }
 
-/// Handles the `getaddrinfo` call from mirrord-layer.
-fn get_addr_info(request: GetAddrInfoRequest) -> RemoteResult<Vec<AddrInfoInternal>> {
-    trace!("get_addr_info -> request {:#?}", request);
-
-    let GetAddrInfoRequest {
-        node,
-        service,
-        hints,
-    } = request;
-
-    dns_lookup::getaddrinfo(
-        node.as_deref(),
-        service.as_deref(),
-        hints.map(|h| h.into_lookup()),
-    )
-    .map(|addrinfo_iter| {
-        addrinfo_iter
-            .map(|result| {
-                // Each element in the iterator is actually a `Result<AddrInfo, E>`, so
-                // we have to `map` individually, then convert to one of our errors.
-                result.map(Into::into).map_err(From::from)
-            })
-            // Now we can flatten and transpose the whole thing into this.
-            .collect::<Result<Vec<AddrInfoInternal>, _>>()
-    })
-    .map_err(|fail| ResponseError::from(std::io::Error::from(fail)))
-    // Stable rust equivalent to `Result::flatten`.
-    .and_then(std::convert::identity)
-}
-
 struct ClientConnectionHandler {
     /// Used to prevent closing the main loop (`handle_loop`) when any request is done (tcp
     /// outgoing feature). Stays `true` until `agent` receives an `ExitRequest`.
@@ -186,6 +143,8 @@ struct ClientConnectionHandler {
     tcp_stealer_sender: Sender<LayerTcpSteal>,
     tcp_stealer_receiver: Receiver<DaemonTcp>,
     tcp_outgoing_api: TcpOutgoingApi,
+    udp_outgoing_api: UdpOutgoingApi,
+    dns_sender: Sender<DnsRequest>,
 }
 
 impl ClientConnectionHandler {
@@ -197,6 +156,7 @@ impl ClientConnectionHandler {
         ephemeral: bool,
         sniffer_command_sender: Sender<SnifferCommand>,
         cancel_token: CancellationToken,
+        dns_sender: Sender<DnsRequest>,
     ) -> Result<(), AgentError> {
         let file_manager = match pid {
             Some(_) => FileManager::new(pid),
@@ -211,13 +171,16 @@ impl ClientConnectionHandler {
         let (tcp_steal_layer_sender, tcp_steal_layer_receiver) = mpsc::channel(CHANNEL_SIZE);
         let (tcp_steal_daemon_sender, tcp_steal_daemon_receiver) = mpsc::channel(CHANNEL_SIZE);
 
-        let _ = run_thread(steal_worker(
-            tcp_steal_layer_receiver,
-            tcp_steal_daemon_sender,
-            pid,
-        ));
+        let _ = run_thread(async move {
+            if let Err(err) =
+                steal_worker(tcp_steal_layer_receiver, tcp_steal_daemon_sender, pid).await
+            {
+                error!("steal_worker error {:?}", err)
+            }
+        });
 
         let tcp_outgoing_api = TcpOutgoingApi::new(pid);
+        let udp_outgoing_api = UdpOutgoingApi::new(pid);
 
         let mut client_handler = ClientConnectionHandler {
             id,
@@ -228,6 +191,8 @@ impl ClientConnectionHandler {
             tcp_stealer_receiver: tcp_steal_daemon_receiver,
             tcp_stealer_sender: tcp_steal_layer_sender,
             tcp_outgoing_api,
+            udp_outgoing_api,
+            dns_sender,
         };
 
         client_handler.handle_loop(cancel_token).await?;
@@ -271,6 +236,9 @@ impl ClientConnectionHandler {
                 message = self.tcp_outgoing_api.daemon_message() => {
                     self.respond(DaemonMessage::TcpOutgoing(message?)).await?;
                 },
+                message = self.udp_outgoing_api.daemon_message() => {
+                    self.respond(DaemonMessage::UdpOutgoing(message?)).await?;
+                },
                 _ = token.cancelled() => {
                     break;
                 }
@@ -290,6 +258,9 @@ impl ClientConnectionHandler {
             }
             ClientMessage::TcpOutgoing(layer_message) => {
                 self.tcp_outgoing_api.layer_message(layer_message).await?
+            }
+            ClientMessage::UdpOutgoing(layer_message) => {
+                self.udp_outgoing_api.layer_message(layer_message).await?
             }
             ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
                 env_vars_filter,
@@ -313,7 +284,12 @@ impl ClientConnectionHandler {
                     .await?
             }
             ClientMessage::GetAddrInfoRequest(request) => {
-                let response = get_addr_info(request);
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                let dns_request = DnsRequest::new(request, tx);
+                self.dns_sender.send(dns_request).await?;
+
+                trace!("waiting for answer from dns thread");
+                let response = rx.await?;
 
                 trace!("GetAddrInfoRequest -> response {:#?}", response);
 
@@ -366,7 +342,8 @@ async fn start_agent() -> Result<(), AgentError> {
     // Cancel all other tasks on exit
     let cancel_guard = cancellation_token.clone().drop_guard();
     let (sniffer_command_tx, sniffer_command_rx) = mpsc::channel::<SnifferCommand>(1000);
-
+    let (dns_sender, dns_receiver) = mpsc::channel(1000);
+    let _ = run_thread(dns_worker(dns_receiver, pid));
     let sniffer_task = run_thread(TCPConnectionSniffer::start(
         sniffer_command_rx,
         pid,
@@ -386,8 +363,9 @@ async fn start_agent() -> Result<(), AgentError> {
                     state.clients.insert(client_id);
                     let sniffer_command_tx = sniffer_command_tx.clone();
                     let cancellation_token = cancellation_token.clone();
+                    let dns_sender = dns_sender.clone();
                     let client = tokio::spawn(async move {
-                        match ClientConnectionHandler::start(client_id, stream, pid, args.ephemeral_container, sniffer_command_tx, cancellation_token).await {
+                        match ClientConnectionHandler::start(client_id, stream, pid, args.ephemeral_container, sniffer_command_tx, cancellation_token, dns_sender).await {
                             Ok(_) => {
                                 debug!("ClientConnectionHandler::start -> Client {} disconnected", client_id);
                             }
@@ -430,7 +408,11 @@ async fn start_agent() -> Result<(), AgentError> {
 #[tokio::main]
 async fn main() -> Result<(), AgentError> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_thread_ids(true)
+                .with_span_events(FmtSpan::ACTIVE),
+        )
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 

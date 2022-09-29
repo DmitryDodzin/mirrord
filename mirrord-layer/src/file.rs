@@ -32,13 +32,15 @@ static IGNORE_FILES: LazyLock<RegexSet> = LazyLock::new(|| {
     // `node app.js`, or `cargo run app`), we're ignoring files from the current working directory.
     let current_dir = env::current_dir().unwrap();
 
-    let set = RegexSet::new(&[
+    let set = RegexSet::new([
         r".*\.so",
         r".*\.d",
         r".*\.pyc",
         r".*\.py",
         r".*\.js",
         r".*\.pth",
+        r".*\.plist",
+        r".*venv\.cfg",
         r"^/proc/.*",
         r"^/sys/.*",
         r"^/lib/.*",
