@@ -10,6 +10,7 @@ pub mod incoming;
 pub mod network;
 pub mod outgoing;
 pub mod pod;
+pub mod preview;
 pub mod util;
 
 use std::path::Path;
@@ -235,6 +236,7 @@ mod tests {
                         udp: Some(false),
                     }),
                 }),
+                preview: ToggleableConfig::Enabled(false),
             },
             pod: PodFileConfig {
                 name: Some("test-service-abcdefg-abcd".to_owned()),

@@ -19,6 +19,12 @@ pub enum ToggleableConfig<T> {
     Config(T),
 }
 
+impl<T> ToggleableConfig<T> {
+    pub fn disabled() -> Self {
+        ToggleableConfig::<T>::Enabled(false)
+    }
+}
+
 impl<T> Default for ToggleableConfig<T> {
     fn default() -> Self {
         ToggleableConfig::<T>::Enabled(true)

@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     config::source::MirrordConfigSource, env::EnvFileConfig, fs::FsConfig,
-    network::NetworkFileConfig, util::ToggleableConfig,
+    network::NetworkFileConfig, preview::PreviewFileConfig, util::ToggleableConfig,
 };
 
 #[derive(MirrordConfig, Deserialize, Default, PartialEq, Eq, Clone, Debug)]
@@ -21,4 +21,8 @@ pub struct FeatureFileConfig {
     #[serde(default)]
     #[config(nested)]
     pub network: ToggleableConfig<NetworkFileConfig>,
+
+    #[serde(default = "ToggleableConfig::disabled")]
+    #[config(nested)]
+    pub preview: ToggleableConfig<PreviewFileConfig>,
 }

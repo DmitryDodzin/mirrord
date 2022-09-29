@@ -1499,7 +1499,6 @@ dependencies = [
 name = "mirrord-auth"
 version = "3.0.10-alpha"
 dependencies = [
- "lazy_static",
  "rand 0.8.5",
  "reqwest",
  "serde",
@@ -1549,8 +1548,10 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "libc",
+ "mirrord-auth",
  "mirrord-config",
  "mirrord-macro",
+ "mirrord-preview",
  "mirrord-protocol",
  "nix 0.24.2",
  "rand 0.8.5",
@@ -1575,6 +1576,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "mirrord-preview"
+version = "3.0.10-alpha"
+dependencies = [
+ "async-stream",
+ "bincode",
+ "http",
+ "mirrord-auth",
+ "reqwest",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -2444,6 +2460,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio",
  "tokio-native-tls",
+ "tokio-util 0.7.4",
  "tower-service",
  "url",
  "wasm-bindgen",
