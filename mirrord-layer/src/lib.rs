@@ -10,6 +10,7 @@
 use std::{
     collections::{HashSet, VecDeque},
     path::PathBuf,
+    str::FromStr,
     sync::{LazyLock, OnceLock},
 };
 
@@ -21,11 +22,22 @@ use frida_gum::{interceptor::Interceptor, Gum};
 use futures::{SinkExt, StreamExt};
 use kube::api::Portforwarder;
 use libc::c_int;
+use mirrord_auth::AuthenticationError;
 use mirrord_config::{config::MirrordConfig, util::VecOrSingle, LayerConfig, LayerFileConfig};
 use mirrord_macro::hook_guard_fn;
+use mirrord_preview::{
+    client::UpdateMessage,
+    connection::{ConnectionError, ConnectionStatus},
+    filter::FilterPorts,
+    PreviewConfig,
+};
 use mirrord_protocol::{
     AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
     GetEnvVarsRequest,
+};
+use nix::{
+    sys::signal::{self, Signal},
+    unistd::Pid,
 };
 use outgoing::{tcp::TcpOutgoingHandler, udp::UdpOutgoingHandler};
 use rand::Rng;
@@ -42,7 +54,7 @@ use tokio::{
 use tracing::{error, info, trace};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 
-use crate::{common::HookMessage, file::FileHandler};
+use crate::{common::HookMessage, file::FileHandler, tcp::HookMessageTcp};
 
 mod common;
 mod detour;
@@ -123,11 +135,22 @@ fn init(config: LayerConfig) {
 
     info!("Initializing mirrord-layer!");
 
+    let (preview_update_tx, preview_update_rx) = channel(100);
+
+    if config.feature.preview.enabled {
+        RUNTIME.spawn(start_preview_connection(
+            config.feature.preview.clone(),
+            preview_update_rx,
+            config.pod.name.is_some(),
+        ));
+    }
+
     let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
 
-    info!("Using port `{connection_port:?}` for communication");
+    if config.pod.name.is_some() {
+        info!("Using port `{connection_port:?}` for communication");
 
-    let port_forwarder = RUNTIME
+        let port_forwarder = RUNTIME
         .block_on(pod_api::create_agent(config.clone(), connection_port))
         .unwrap_or_else(|err| match err {
             LayerError::KubeError(kube::Error::HyperError(err)) => {
@@ -141,31 +164,33 @@ fn init(config: LayerConfig) {
             _ => panic!("failed to create agent: {}", err),
         });
 
-    let (sender, receiver) = channel::<HookMessage>(1000);
-    unsafe {
-        HOOK_SENDER = Some(sender);
-    };
+        let (sender, receiver) = channel::<HookMessage>(1000);
+        unsafe {
+            HOOK_SENDER = Some(sender);
+        };
 
-    let enabled_file_ops = ENABLED_FILE_OPS
-        .get_or_init(|| config.feature.fs.is_read() || config.feature.fs.is_write());
-    ENABLED_FILE_RO_OPS
-        .set(config.feature.fs.is_read())
-        .expect("Setting ENABLED_FILE_RO_OPS singleton");
-    ENABLED_TCP_OUTGOING
-        .set(config.feature.network.outgoing.tcp)
-        .expect("Setting ENABLED_TCP_OUTGOING singleton");
-    ENABLED_UDP_OUTGOING
-        .set(config.feature.network.outgoing.udp)
-        .expect("Setting ENABLED_UDP_OUTGOING singleton");
+        let enabled_file_ops = ENABLED_FILE_OPS
+            .get_or_init(|| config.feature.fs.is_read() || config.feature.fs.is_write());
+        ENABLED_FILE_RO_OPS
+            .set(config.feature.fs.is_read())
+            .expect("Setting ENABLED_FILE_RO_OPS singleton");
+        ENABLED_TCP_OUTGOING
+            .set(config.feature.network.outgoing.tcp)
+            .expect("Setting ENABLED_TCP_OUTGOING singleton");
+        ENABLED_UDP_OUTGOING
+            .set(config.feature.network.outgoing.udp)
+            .expect("Setting ENABLED_UDP_OUTGOING singleton");
 
-    enable_hooks(*enabled_file_ops, config.feature.network.dns);
+        enable_hooks(*enabled_file_ops, config.feature.network.dns);
 
-    RUNTIME.block_on(start_layer_thread(
-        port_forwarder,
-        receiver,
-        config,
-        connection_port,
-    ));
+        RUNTIME.block_on(start_layer_thread(
+            port_forwarder,
+            receiver,
+            config,
+            connection_port,
+            preview_update_tx,
+        ));
+    }
 }
 
 fn should_load(given_process: &str, skip_processes: Option<Vec<String>>) -> bool {
@@ -200,13 +225,19 @@ where
     pub tcp_steal_handler: TcpStealHandler,
 
     steal: bool,
+
+    preview_update_sender: Sender<UpdateMessage>,
 }
 
 impl<T> Layer<T>
 where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send,
 {
-    fn new(codec: actix_codec::Framed<T, ClientCodec>, steal: bool) -> Layer<T> {
+    fn new(
+        codec: actix_codec::Framed<T, ClientCodec>,
+        steal: bool,
+        preview_update_sender: Sender<UpdateMessage>,
+    ) -> Layer<T> {
         Self {
             codec,
             ping: false,
@@ -217,6 +248,7 @@ where
             getaddrinfo_handler_queue: VecDeque::new(),
             tcp_steal_handler: TcpStealHandler::default(),
             steal,
+            preview_update_sender,
         }
     }
 
@@ -224,6 +256,18 @@ where
     async fn handle_hook_message(&mut self, hook_message: HookMessage) {
         match hook_message {
             HookMessage::Tcp(message) => {
+                match message {
+                    HookMessageTcp::Listen(ref listen) => {
+                        let _ = self
+                            .preview_update_sender
+                            .send(UpdateMessage::PortRemap(
+                                listen.requested_port.into(),
+                                listen.mirror_port.into(),
+                            ))
+                            .await;
+                    }
+                }
+
                 if self.steal {
                     self.tcp_steal_handler
                         .handle_hook_message(message, &mut self.codec)
@@ -323,8 +367,9 @@ async fn thread_loop(
         ClientCodec,
     >,
     steal: bool,
+    preview_update_sender: Sender<UpdateMessage>,
 ) {
-    let mut layer = Layer::new(codec, steal);
+    let mut layer = Layer::new(codec, steal, preview_update_sender);
     loop {
         select! {
             hook_message = receiver.recv() => {
@@ -386,6 +431,7 @@ async fn start_layer_thread(
     receiver: Receiver<HookMessage>,
     config: LayerConfig,
     connection_port: u16,
+    preview_update_sender: Sender<UpdateMessage>,
 ) {
     let port = pf.take_stream(connection_port).unwrap(); // TODO: Make port configurable
 
@@ -437,7 +483,80 @@ async fn start_layer_thread(
         receiver,
         codec,
         config.feature.network.incoming.is_steal(),
+        preview_update_sender,
     ));
+}
+
+/// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
+#[tracing::instrument(level = "trace", skip(preview_update_receiver))]
+async fn start_preview_connection(
+    config: mirrord_config::preview::PreviewConfig,
+    preview_update_receiver: Receiver<UpdateMessage>,
+    listen_for_updates: bool,
+) {
+    let mirrord_config::preview::PreviewConfig {
+        auth_server,
+        server,
+        username,
+        allow_ports,
+        deny_ports,
+        ..
+    } = config;
+
+    let config = PreviewConfig {
+        auth_server,
+        server,
+        username,
+        allow_ports: allow_ports.and_then(|val| FilterPorts::from_str(&val.join(",")).ok()),
+        deny_ports: deny_ports
+            .and_then(|val| FilterPorts::from_str(&val.join(",")).ok())
+            .unwrap_or_default(),
+        listen_for_updates,
+    };
+
+    let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;
+
+    match connection {
+        Ok(mut status) => {
+            while let Some(status) = status.recv().await {
+                trace!("start_preview_connection -> status {:?}", status);
+
+                match status {
+                    ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
+                    ConnectionStatus::Error(err) => {
+                        error!("start_preview_connection -> status error {}", err);
+                    }
+                    ConnectionStatus::Disconnected => {
+                        let _ =
+                            signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Err(err) => {
+            error!("start_preview_connection -> {}", err);
+
+            match err {
+                ConnectionError::Authentication(err) => match err {
+                    AuthenticationError::IoError(_) => {
+                        println!(
+                            "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
+                        );
+                    }
+                    AuthenticationError::ConfigParseError(_) => {
+                        println!(
+                            "mirrord-layer encountered an issue:\n\nAuthentication file is malformd,\n  please run 'mirrord login' to update authentication file.\n"
+                        );
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            let _ = signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
+        }
+    };
 }
 
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.

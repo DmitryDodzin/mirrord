@@ -7,7 +7,7 @@ use crate::config::source::MirrordConfigSource;
 #[serde(deny_unknown_fields)]
 #[config(map_to = PodConfig)]
 pub struct PodFileConfig {
-    #[config(unwrap, env = "MIRRORD_AGENT_IMPERSONATED_POD_NAME")]
+    #[config(env = "MIRRORD_AGENT_IMPERSONATED_POD_NAME")]
     pub name: Option<String>,
 
     #[config(env = "MIRRORD_AGENT_IMPERSONATED_POD_NAMESPACE", default = "default")]
