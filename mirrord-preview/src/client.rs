@@ -238,7 +238,7 @@ async fn wrap_connection(
                     }
                 };
 
-                trace!("wrap_connection -> response {:?}", response);
+                trace!("wrap_connection -> response -> request_id {:?}", response.request_id);
 
                 let _ = tx
                     .send(response)
@@ -266,15 +266,22 @@ async fn handle_proxied_message(
     client: &reqwest::Client,
     req: ProxiedRequest,
 ) -> Result<(u16, HttpPayload), ProxiedError> {
-    trace!("handle_proxied_message -> {:?}", req);
-
     let ProxiedRequest {
+        request_id,
         method,
         port,
         path,
         payload,
         ..
     } = req;
+
+    trace!(
+        "handle_proxied_message -> method {:?} | port {:?} | path {:?} | request_id {:?}",
+        method,
+        port,
+        path,
+        request_id
+    );
 
     let url = format!("http://127.0.0.1:{}{}", port, path);
 
