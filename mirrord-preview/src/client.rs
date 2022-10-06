@@ -86,9 +86,15 @@ pub async fn connect(
 
     tokio::spawn(handle_inbound(connection_config.clone(), register, in_tx));
 
-    tokio::spawn(handle_outbound(connection_config, out_rx));
+    tokio::spawn(handle_outbound(connection_config.clone(), out_rx));
 
-    tokio::spawn(wrap_connection(out_tx, in_rx, config, update_rx));
+    tokio::spawn(wrap_connection(
+        out_tx,
+        in_rx,
+        config,
+        connection_config,
+        update_rx,
+    ));
 
     Ok(status_rx)
 }
@@ -194,6 +200,7 @@ async fn wrap_connection(
     tx: Sender<ProxiedResponse>,
     mut rx: Receiver<ProxiedRequest>,
     config: PreviewConfig,
+    connection_config: ConnectionConfig,
     mut update_rx: Receiver<UpdateMessage>,
 ) {
     trace!("wrap_connection -> config {:?}", config);
@@ -220,12 +227,25 @@ async fn wrap_connection(
                         req.port = *remapped_port;
                     }
 
-                    let payload = handle_proxied_message(&client, req).await;
+                    match get_proxied_message(&client, &connection_config, req.request_id).await {
+                        Ok(req_payload) => {
+                            let payload = handle_proxied_message(&client, req, req_payload).await;
 
-                    ProxiedResponse {
-                        request_id,
-                        payload,
+                            ProxiedResponse {
+                                request_id,
+                                payload,
+                            }
+                        }
+                        Err(err) => {
+                            let _ = connection_config
+                                .status_tx
+                                .send(ConnectionStatus::Error(err))
+                                .await;
+
+                            continue;
+                        }
                     }
+
                 } else {
                     let payload = HttpPayload {
                         headers: HashMap::new(),
@@ -262,16 +282,34 @@ async fn wrap_connection(
     }
 }
 
+async fn get_proxied_message(
+    client: &reqwest::Client,
+    config: &ConnectionConfig,
+    request_id: u64,
+) -> Result<HttpPayload, ConnectionError> {
+    let bytes = client
+        .get(format!("{}/{}", config.listen_url, request_id))
+        .bearer_auth(config.auth_config.access_token.secret())
+        .send()
+        .await?
+        .bytes()
+        .await?;
+
+    bincode::decode_from_slice(&bytes, bincode::config::standard())
+        .map(|(payload, _)| payload)
+        .map_err(|err| err.into())
+}
+
 async fn handle_proxied_message(
     client: &reqwest::Client,
     req: ProxiedRequest,
+    payload: HttpPayload,
 ) -> Result<(u16, HttpPayload), ProxiedError> {
     let ProxiedRequest {
         request_id,
         method,
         port,
         path,
-        payload,
         ..
     } = req;
 

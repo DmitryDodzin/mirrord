@@ -14,7 +14,6 @@ pub struct ProxiedRequest {
     pub method: String,
     pub port: u32,
     pub path: String,
-    pub payload: HttpPayload,
 }
 
 #[derive(Debug, Encode, Decode)]
