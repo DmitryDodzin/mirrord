@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::Infallible};
+use std::collections::HashMap;
 
 use mirrord_auth::AuthConfig;
 use reqwest::{Body, Method};
@@ -167,33 +167,25 @@ async fn handle_inbound(
 async fn handle_outbound(config: ConnectionConfig, mut out_rx: Receiver<ProxiedResponse>) {
     let client = reqwest::Client::new();
 
-    let stream = async_stream::stream! {
-        while let Some(req) = out_rx.recv().await {
-            if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
-                trace!("connect -> outbound -> bytes {:?}(lenght)", payload.len());
+    while let Some(req) = out_rx.recv().await {
+        if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
+            trace!("connect -> outbound -> bytes {:?}(lenght)", payload.len());
 
-                yield Ok::<_, Infallible>(payload)
+            if let Err(err) = client
+                .post(&config.listen_url)
+                .bearer_auth(config.auth_config.access_token.secret())
+                .body(Body::from(payload))
+                .send()
+                .await
+                .and_then(|res| res.error_for_status())
+            {
+                let _ = config
+                    .status_tx
+                    .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                    .await;
             }
         }
-    };
-
-    if let Err(err) = client
-        .post(&config.listen_url)
-        .bearer_auth(config.auth_config.access_token.secret())
-        .body(Body::wrap_stream(stream))
-        .send()
-        .await
-        .and_then(|res| res.error_for_status())
-    {
-        let _ = config
-            .status_tx
-            .send(ConnectionStatus::Error(ConnectionError::from(err)))
-            .await;
     }
-
-    trace!("connect -> outbound -> closed");
-
-    let _ = config.status_tx.send(ConnectionStatus::Disconnected).await;
 }
 
 async fn wrap_connection(
@@ -294,6 +286,12 @@ async fn get_proxied_message(
         .await?
         .bytes()
         .await?;
+
+    trace!(
+        "get_proxied_message -> request_id {:?} | bytes {}(length)",
+        request_id,
+        bytes.len()
+    );
 
     bincode::decode_from_slice(&bytes, bincode::config::standard())
         .map(|(payload, _)| payload)

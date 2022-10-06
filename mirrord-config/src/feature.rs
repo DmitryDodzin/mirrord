@@ -6,7 +6,7 @@ use crate::{
     network::NetworkFileConfig, preview::PreviewFileConfig, util::ToggleableConfig,
 };
 
-#[derive(MirrordConfig, Deserialize, Default, PartialEq, Eq, Clone, Debug)]
+#[derive(MirrordConfig, Deserialize, PartialEq, Eq, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 #[config(map_to = FeatureConfig)]
 pub struct FeatureFileConfig {
@@ -25,4 +25,15 @@ pub struct FeatureFileConfig {
     #[serde(default = "ToggleableConfig::disabled")]
     #[config(nested)]
     pub preview: ToggleableConfig<PreviewFileConfig>,
+}
+
+impl Default for FeatureFileConfig {
+    fn default() -> Self {
+        FeatureFileConfig {
+            env: ToggleableConfig::enabled(),
+            fs: ToggleableConfig::enabled(),
+            network: ToggleableConfig::enabled(),
+            preview: ToggleableConfig::disabled(),
+        }
+    }
 }
