@@ -169,25 +169,44 @@ async fn handle_inbound(
 }
 
 async fn handle_outbound(config: ConnectionConfig, mut out_rx: Receiver<ProxiedResponse>) {
-    let client = reqwest::Client::new();
+    let client = match reqwest::Client::builder()
+        .tcp_keepalive(Duration::from_secs(10))
+        .http2_keep_alive_interval(Duration::from_secs(1))
+        .http2_keep_alive_timeout(Duration::from_secs(10))
+        .http2_keep_alive_while_idle(true)
+        .build()
+    {
+        Ok(client) => client,
+        Err(err) => {
+            let _ = config
+                .status_tx
+                .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                .await;
+
+            let _ = config.status_tx.send(ConnectionStatus::Disconnected).await;
+
+            return;
+        }
+    };
 
     while let Some(req) = out_rx.recv().await {
         if let Ok(payload) = bincode::encode_to_vec(req, bincode::config::standard()) {
             trace!("connect -> outbound -> bytes {:?}(lenght)", payload.len());
 
-            if let Err(err) = client
+            let status_tx = config.status_tx.clone();
+
+            let request = client
                 .post(&config.listen_url)
                 .bearer_auth(config.auth_config.access_token.secret())
-                .body(Body::from(payload))
-                .send()
-                .await
-                .and_then(|res| res.error_for_status())
-            {
-                let _ = config
-                    .status_tx
-                    .send(ConnectionStatus::Error(ConnectionError::from(err)))
-                    .await;
-            }
+                .body(Body::from(payload));
+
+            tokio::spawn(async move {
+                if let Err(err) = request.send().await.and_then(|res| res.error_for_status()) {
+                    let _ = status_tx
+                        .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                        .await;
+                }
+            });
         }
     }
 }
@@ -201,10 +220,28 @@ async fn wrap_connection(
 ) {
     trace!("wrap_connection -> config {:?}", config);
 
-    let client = reqwest::Client::builder()
+    let client = match reqwest::Client::builder()
         .tcp_keepalive(Duration::from_secs(10))
+        .http2_keep_alive_interval(Duration::from_secs(1))
+        .http2_keep_alive_timeout(Duration::from_secs(10))
+        .http2_keep_alive_while_idle(true)
         .build()
-        .unwrap();
+    {
+        Ok(client) => client,
+        Err(err) => {
+            let _ = connection_config
+                .status_tx
+                .send(ConnectionStatus::Error(ConnectionError::from(err)))
+                .await;
+
+            let _ = connection_config
+                .status_tx
+                .send(ConnectionStatus::Disconnected)
+                .await;
+
+            return;
+        }
+    };
 
     let port_remapper = RwLock::new(HashMap::new());
 
@@ -300,9 +337,9 @@ async fn get_proxied_message(
     };
 
     trace!(
-        "get_proxied_message -> request_id {:?} | bytes {:?}",
+        "get_proxied_message -> request_id {:?} | bytes {:?}(lenght)",
         req.request_id,
-        String::from_utf8(bytes.to_vec())
+        bytes.len()
     );
 
     bincode::decode_from_slice(&bytes, bincode::config::standard())
