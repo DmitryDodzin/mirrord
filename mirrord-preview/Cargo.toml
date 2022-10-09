@@ -26,6 +26,7 @@ mirrord-auth = { path="../mirrord-auth" }
 
 async-stream = { version = "0.3", optional = true }
 bincode =  { version = "2.0.0-rc.1" }
+bytes = "1"
 http = "0.2"
 thiserror.workspace = true
 reqwest =  { workspace = true, features = ["stream"] }

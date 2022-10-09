@@ -1585,6 +1585,7 @@ version = "3.0.10-alpha"
 dependencies = [
  "async-stream",
  "bincode",
+ "bytes",
  "http",
  "mirrord-auth",
  "reqwest",

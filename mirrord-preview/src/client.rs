@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
+use bytes::Bytes;
 use mirrord_auth::AuthConfig;
 use reqwest::{Body, Method};
 use tokio::sync::{
@@ -11,7 +12,10 @@ use tracing::{error, trace};
 
 use crate::{
     connection::{ConnectionError, ConnectionStatus},
-    proxy::{HttpPayload, LayerRegisterReply, ProxiedError, ProxiedRequest, ProxiedResponse},
+    proxy::{
+        HttpPayload, LayerRegisterReply, ProxiedError, ProxiedRequest, ProxiedRequestPayload,
+        ProxiedResponse,
+    },
     PreviewConfig,
 };
 
@@ -197,7 +201,10 @@ async fn wrap_connection(
 ) {
     trace!("wrap_connection -> config {:?}", config);
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .tcp_keepalive(Duration::from_secs(10))
+        .build()
+        .unwrap();
 
     let port_remapper = RwLock::new(HashMap::new());
 
@@ -219,7 +226,7 @@ async fn wrap_connection(
                         req.port = *remapped_port;
                     }
 
-                    match get_proxied_message(&client, &connection_config, req.request_id).await {
+                    match get_proxied_message(&client, &connection_config, &req).await {
                         Ok(req_payload) => {
                             let payload = handle_proxied_message(&client, req, req_payload).await;
 
@@ -277,20 +284,25 @@ async fn wrap_connection(
 async fn get_proxied_message(
     client: &reqwest::Client,
     config: &ConnectionConfig,
-    request_id: u64,
+    req: &ProxiedRequest,
 ) -> Result<HttpPayload, ConnectionError> {
-    let bytes = client
-        .get(format!("{}/{}", config.listen_url, request_id))
-        .bearer_auth(config.auth_config.access_token.secret())
-        .send()
-        .await?
-        .bytes()
-        .await?;
+    let bytes = match &req.payload {
+        ProxiedRequestPayload::Body(bytes) => Bytes::from(bytes.clone()),
+        ProxiedRequestPayload::Defered => {
+            client
+                .get(format!("{}/{}", config.listen_url, req.request_id))
+                .bearer_auth(config.auth_config.access_token.secret())
+                .send()
+                .await?
+                .bytes()
+                .await?
+        }
+    };
 
     trace!(
-        "get_proxied_message -> request_id {:?} | bytes {}(length)",
-        request_id,
-        bytes.len()
+        "get_proxied_message -> request_id {:?} | bytes {:?}",
+        req.request_id,
+        String::from_utf8(bytes.to_vec())
     );
 
     bincode::decode_from_slice(&bytes, bincode::config::standard())

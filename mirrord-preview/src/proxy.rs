@@ -9,11 +9,18 @@ pub struct HttpPayload {
 }
 
 #[derive(Debug, Encode, Decode)]
+pub enum ProxiedRequestPayload {
+    Body(Vec<u8>),
+    Defered,
+}
+
+#[derive(Debug, Encode, Decode)]
 pub struct ProxiedRequest {
     pub request_id: u64,
     pub method: String,
     pub port: u32,
     pub path: String,
+    pub payload: ProxiedRequestPayload,
 }
 
 #[derive(Debug, Encode, Decode)]
