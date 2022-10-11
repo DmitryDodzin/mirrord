@@ -110,7 +110,6 @@ fn before_init() {
                 let skip_processes = config.skip_processes.clone().map(VecOrSingle::to_vec);
 
                 if should_load(given_process, skip_processes) {
-                    deprecation_check(&config);
                     init(config);
                 }
             }
@@ -170,6 +169,8 @@ fn init(config: LayerConfig) {
     }
 
     if full_preview {
+        deprecation_check(&config);
+
         start_layer(config, preview_update_tx)
     }
 }

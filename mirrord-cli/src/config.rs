@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgGroup, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -21,11 +21,6 @@ pub(super) enum Commands {
 }
 
 #[derive(Args, Debug)]
-#[clap(group(
-    ArgGroup::new("exec")
-        .required(true)
-        .args(&["target", "pod-name", "config-file"]),
-))]
 pub(super) struct ExecArgs {
     /// Target name to mirror.    
     /// Target can either be a deployment or a pod.
@@ -133,7 +128,7 @@ pub(super) struct ExecArgs {
     pub no_udp_outgoing: bool,
 
     /// Load config from config file
-    #[clap(short = 'f', conflicts_with_all = &["target", "pod-name"], long, value_parser)]
+    #[clap(short = 'f', long, value_parser)]
     pub config_file: Option<PathBuf>,
 }
 
