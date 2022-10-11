@@ -7,19 +7,105 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+- Layer integration tests for more apps. Closes
+  [[#472](https://github.com/metalbear-co/mirrord/issues/472)].
+
+## Changed
+- Don't report InProgress io error as error (log as info)
+- Rename http mirroring tests from `integration` to `http_mirroring` since there are 
+  now also integration tests in other files.
+
+### Fixed
+- Fix IntelliJ Extension artifact - use glob pattern
+
+## 3.0.19-alpha
+
+### Added
+- Release image for armv7 (Cloud ARM)
+
+### Fixed
+- Release for non-amd64 arch failed because of lack of QEMU step in the github action. Re-added it
+
+## 3.0.18-alpha
+
+### Changed
+- Replaced `pcap` dependency with our own `rawsocket` to make cross compiling faster and easier.
+
+## 3.0.17-alpha
+
+### Fixed
+- Release CI: Remove another failing step
+
+## 3.0.16-alpha
+
+### Fixed
+- Release CI: Temporarily comment out failing step
+
+## 3.0.15-alpha
+
+### Fixed
+- Release CI: Fix checkout action position in intelliJ release.
+
+## 3.0.14-alpha
+
+### Added
+- Layer integration test. Tests the layer's loading and hooking in an http mirroring simulation with a flask web app. 
+  Addresses but does not
+  close [[#472](https://github.com/metalbear-co/mirrord/issues/472)] (more integration tests still needed).
+
+### Fixed
+- Release CI: Fix paths for release artifacts
+
+## 3.0.13-alpha
+
+### Added
+- mirrord-cli: added a SIP protection check for macos binaries, closes [[#412](https://github.com/metalbear-co/mirrord/issues/412)]
+
+### Fixed
+- Fixed unused dependencies issue, closes [[#494](https://github.com/metalbear-co/mirrord/issues/494)]
+
+### Changed
+- Remove building of arm64 Docker image from the release CI
+
+## 3.0.12-alpha
+
+### Added
+- Release CI: add extensions as artifacts, closes [[#355](https://github.com/metalbear-co/mirrord/issues/355)]
+
+### Changed
+- Remote operations that fail logged on `info` level instead of `error` because having a file not found, connection failed, etc can be part of a valid successful flow.
+- mirrord-layer: When handling an outgoing connection to localhost, check first if it's a socket we intercept/mirror, then just let it connect normally.
+- mirrord-layer: removed `tracing::instrument` from `*_detour` functions.
+
+### Fixed
+- `getaddrinfo` now uses [`trust-dns-resolver`](https://docs.rs/trust-dns-resolver/latest/trust_dns_resolver/) when resolving DNS (previously it would do a `getaddrinfo` call in mirrord-agent that could result in incompatibility between the mirrored pod and the user environments).
+- Support clusters running Istio. Closes [[#485](https://github.com/metalbear-co/mirrord/issues/485)].
+
+## 3.0.11-alpha
+
+### Added
+- Support impersonated deployments, closes [[#293](https://github.com/metalbear-co/mirrord/issues/293)]
+- Shorter way to select which deployment/pod/container to impersonate through `--target` or `MIRRORD_IMPERSONATED_TARGET`, closes [[#392](https://github.com/metalbear-co/mirrord/issues/392)]
+- mirrord-layer: Support config from file alongside environment variables.
+- intellij-ext: Add version check, closes [[#289](https://github.com/metalbear-co/mirrord/issues/289)]
+- intellij-ext: better support for Windows with WSL.
+
+### Deprecated
+- `--pod-name` or `MIRRORD_AGENT_IMPERSONATED_POD_NAME` is deprecated in favor of `--target` or `MIRRORD_IMPERSONATED_TARGET`
+
+### Fixed
+- tcp-steal working with linkerd meshing.
+- mirrord-layer should exit when agent disconnects or unable to make initial connection
+
 ## 3.0.10-alpha
 
 ### Added
-- Test that verifies that outgoing UDP traffic (only with a bind to non-0 port and a 
+- Test that verifies that outgoing UDP traffic (only with a bind to non-0 port and a
   call to `connect`) is successfully intercepted and forwarded.
-- mirrord-layer: Support config from file alongside environment variables.
 
 ### Fixed
 - macOS binaries should be okay now.
-- tcp-steal working with linkerd meshing.
-
-
-### Fixed
 
 ## 3.0.9-alpha
 

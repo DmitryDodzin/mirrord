@@ -29,7 +29,6 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v1
       # Needed for agent
-      - run: sudo apt install libpcap-dev cmake
       - run: cargo fmt --all -- --check
       - run: cargo clippy -- -D warnings
 
@@ -80,7 +79,6 @@ jobs:
           toolchain: nightly
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
-      - run: sudo apt install -y libpcap-dev cmake
       - run: sudo PATH=/home/runner/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:/usr/bin:/usr/sbin /home/runner/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo test -p mirrord-agent
 
   test_mirrord_layer:
@@ -99,7 +97,7 @@ jobs:
         with:
           key: ${{matrix.os}}
       - run: |
-          cargo test -p mirrord-layer
+          cargo test -p mirrord-layer --lib
 
   test_agent_image:
     runs-on: ubuntu-latest
@@ -120,7 +118,7 @@ jobs:
         with:
           name: test
           path: /tmp/test.tar
-
+  
   test_mirrord_layer_cli:
     strategy:
       matrix:
@@ -165,13 +163,91 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           key: ubuntu-latest
-      - run: sudo apt install -y libpcap-dev cmake
       - run: cargo +nightly build --manifest-path=./Cargo.toml
+      - name: upload layer
+        uses: actions/upload-artifact@v3
+        with:
+          name: layer-lib
+          path: target/debug/libmirrord_layer.so
+          if-no-files-found: error
+
+  integration_tests:
+    runs-on: ubuntu-latest
+    needs: [build_mirrord]
+    env:
+      MIRRORD_TEST_USE_EXISTING_LIB: ../target/debug/libmirrord_layer.so
+    steps:
+      - uses: actions/checkout@v2             # Checkout the mirrord repo.
+      - uses: actions-rs/toolchain@v1         # Install rust.
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v1          # Restore rust cache from earlier runs to avoid recompiling dependencies.
+        with:
+          key: ubuntu-latest
+          cache-on-failure: true
+      # TODO: Uncomment when go is enabled.
+      # - uses: actions/setup-go@v3             # Install Go for http mirroring tests with a Go webserver.
+      #   with:
+      #     go-version: "1.19.0"
+      # - run: |                                # Build Go app to test http mirroring with.
+      #     cd mirrord-layer/tests/apps/app_go
+      #     go build -o 19
+      - uses: actions/setup-node@v3           # For http mirroring test.
+        with:
+          node-version: 14
+      - run: npm install express              # For http mirroring test with node.
+      - uses: actions/setup-python@v3         # For http mirroring tests with Flask and FastAPI.
+      - run: pip3 install flask               # For http mirroring test with Flask.
+      - run: pip3 install fastapi             # For http mirroring test with FastAPI.
+      - run: pip3 install uvicorn[standard]   # For http mirroring test with FastAPI.
+      - name: download layer                  # Download layer lib built in the `build_mirrord` job.
+        uses: actions/download-artifact@v3
+        with:
+          name: layer-lib
+          path: target/debug/
+      # Run `http_mirroring` and `self_connect` integration tests of `mirrord-layer`.
+      - run: cargo +nightly test --test http_mirroring --test self_connect -p mirrord-layer
+
+  integration_tests_macos:
+    runs-on: macos-12
+    env:
+      MIRRORD_TEST_USE_EXISTING_LIB: ../target/debug/libmirrord_layer.dylib
+    steps:
+      - uses: actions/checkout@v2             # Checkout the mirrord repo.
+      - uses: actions-rs/toolchain@v1         # Install Rust.
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v1          # Restore rust cache from earlier runs to avoid recompiling dependencies.
+        with:
+          key: macos-12
+          cache-on-failure: true
+      # TODO: Uncomment when go is enabled.
+      # - uses: actions/setup-go@v3             # Install Go for http mirroring tests with a Go webserver.
+      #   with:
+      #     go-version: "1.19.0"
+      # - run: |                                # Build Go app to test http mirroring with.
+      #     cd mirrord-layer/tests/apps/app_go
+      #     go build -o 19
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 14
+      - run: npm install express              # For http mirroring test with node.
+      - uses: actions/setup-python@v3         # For http mirroring tests with Flask and FastAPI.
+      - run: pip3 install flask               # For http mirroring test with Flask.
+      - run: pip3 install fastapi             # For http mirroring test with FastAPI.
+      - run: pip3 install uvicorn[standard]   # For http mirroring test with FastAPI.
+      - run: cargo +nightly build -p mirrord-layer  # Build layer lib. The tests load it into the apps.
+      # Run `http_mirroring` and `self_connect` integration tests of `mirrord-layer`.
+      - run: cargo +nightly test --test http_mirroring --test self_connect -p mirrord-layer
 
   e2e:
     runs-on: ubuntu-latest
     name: e2e
-    needs: [build_mirrord, test_agent_image]
+    needs: [build_mirrord, test_agent_image, integration_tests]
     env:
       MIRRORD_AGENT_RUST_LOG: "warn,mirrord=debug"
     steps:
@@ -190,9 +266,6 @@ jobs:
         with:
           node-version: 14
       - run: npm install express
-      - run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libpcap-dev cmake
       - uses: actions/setup-python@v3
       - run: pip3 install flask
       - run: pip3 install fastapi
@@ -233,6 +306,9 @@ jobs:
       - run: |
           cd tests/go-e2e-dns
           go build -o 19
+      - run: |
+          cd tests/rust-e2e-fileops
+          cargo build
       - name: start minikube
         uses: medyagh/setup-minikube@master
         with:
@@ -261,7 +337,7 @@ jobs:
   e2e_macos:
     runs-on: macos-12
     name: e2e macOS
-    needs: [build_mirrord, test_agent_image]
+    needs: [build_mirrord, test_agent_image, integration_tests_macos]
     env:
       MIRRORD_AGENT_RUST_LOG: "warn,mirrord=debug"
     steps:

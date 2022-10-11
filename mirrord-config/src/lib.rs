@@ -34,14 +34,25 @@ pub struct LayerFileConfig {
     #[config(env = "MIRRORD_SKIP_PROCESSES")]
     pub skip_processes: Option<VecOrSingle<String>>,
 
+    #[config(env = "MIRRORD_IMPERSONATED_TARGET")]
+    pub target: Option<String>,
+
+    #[config(env = "MIRRORD_TARGET_NAMESPACE", default = "default")]
+    pub target_namespace: Option<String>,
+
+    /// IP:PORT to connect to instead of using k8s api, for testing purposes.
+    #[config(env = "MIRRORD_CONNECT_TCP")]
+    pub connect_tcp: Option<String>,
+
     #[serde(default)]
     #[config(nested)]
     pub agent: AgentFileConfig,
 
+    // START | To be removed after deprecated functionality is removed
     #[serde(default)]
     #[config(nested)]
     pub pod: PodFileConfig,
-
+    // END
     #[serde(default)]
     #[config(nested)]
     pub feature: FeatureFileConfig,
@@ -93,6 +104,8 @@ mod tests {
                     r#"
                     {
                         "accept_invalid_certificates": false,
+                        "target": "pod/test-service-abcdefg-abcd",
+                        "target_namespace": "default",
                         "agent": {
                             "log_level": "info",
                             "namespace": "default",
@@ -124,6 +137,8 @@ mod tests {
                 ConfigType::Toml => {
                     r#"
                     accept_invalid_certificates = false
+                    target = "pod/test-service-abcdefg-abcd"
+                    target_namespace = "default"
 
                     [agent]
                     log_level = "info"
@@ -154,6 +169,8 @@ mod tests {
                 ConfigType::Yaml => {
                     r#"
                     accept_invalid_certificates: false
+                    target: "pod/test-service-abcdefg-abcd"
+                    target_namespace: "default"
 
                     agent:
                         log_level: "info"
@@ -215,6 +232,8 @@ mod tests {
 
         let expect = LayerFileConfig {
             accept_invalid_certificates: Some(false),
+            target: Some("pod/test-service-abcdefg-abcd".to_owned()),
+            target_namespace: Some("default".to_owned()),
             skip_processes: None,
             agent: AgentFileConfig {
                 log_level: Some("info".to_owned()),
@@ -243,6 +262,7 @@ mod tests {
                 namespace: Some("default".to_owned()),
                 container: Some("test".to_owned()),
             },
+            connect_tcp: None,
         };
 
         assert_eq!(config, expect);

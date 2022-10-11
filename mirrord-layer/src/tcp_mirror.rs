@@ -20,7 +20,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     error::{LayerError, Result},
@@ -41,7 +41,7 @@ async fn tcp_tunnel(mut local_stream: TcpStream, remote_stream: Receiver<Vec<u8>
                         continue;
                     },
                     Err(fail) => {
-                        info!("Failed reading local_stream with {:#?}", fail);
+                        error!("Failed reading local_stream with {:#?}", fail);
                         break;
                     }
                     Ok(read_amount) if read_amount == 0 => {
@@ -124,6 +124,7 @@ impl TcpHandler for TcpMirrorHandler {
     #[tracing::instrument(level = "trace", skip(self))]
     async fn handle_new_connection(&mut self, tcp_connection: NewTcpConnection) -> Result<()> {
         let stream = self.create_local_stream(&tcp_connection).await?;
+        debug!("Handling new connection: local stream: {:?}.", &stream);
 
         let (sender, receiver) = channel::<Vec<u8>>(1000);
 

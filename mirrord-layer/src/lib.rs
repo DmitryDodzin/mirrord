@@ -6,7 +6,10 @@
 #![feature(result_flattening)]
 #![feature(io_error_uncategorized)]
 #![feature(let_chains)]
+#![feature(async_closure)]
+#![feature(trait_alias)]
 
+extern crate alloc;
 use std::{
     collections::{HashSet, VecDeque},
     path::PathBuf,
@@ -14,16 +17,18 @@ use std::{
     sync::{LazyLock, OnceLock},
 };
 
+use actix_codec::{AsyncRead, AsyncWrite};
 use common::{GetAddrInfoHook, ResponseChannel};
 use ctor::ctor;
 use error::{LayerError, Result};
 use file::OPEN_FILES;
 use frida_gum::{interceptor::Interceptor, Gum};
 use futures::{SinkExt, StreamExt};
-use kube::api::Portforwarder;
 use libc::c_int;
 use mirrord_auth::AuthenticationError;
-use mirrord_config::{config::MirrordConfig, util::VecOrSingle, LayerConfig, LayerFileConfig};
+use mirrord_config::{
+    config::MirrordConfig, pod::PodConfig, util::VecOrSingle, LayerConfig, LayerFileConfig,
+};
 use mirrord_macro::hook_guard_fn;
 use mirrord_preview::{
     client::UpdateMessage,
@@ -32,15 +37,10 @@ use mirrord_preview::{
     PreviewConfig,
 };
 use mirrord_protocol::{
-    AddrInfoInternal, ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetAddrInfoRequest,
-    GetEnvVarsRequest,
-};
-use nix::{
-    sys::signal::{self, Signal},
-    unistd::Pid,
+    dns::{DnsLookup, GetAddrInfoRequest},
+    ClientCodec, ClientMessage, DaemonMessage, EnvVars, GetEnvVarsRequest,
 };
 use outgoing::{tcp::TcpOutgoingHandler, udp::UdpOutgoingHandler};
-use rand::Rng;
 use socket::SOCKETS;
 use tcp::TcpHandler;
 use tcp_mirror::TcpMirrorHandler;
@@ -57,6 +57,7 @@ use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 use crate::{common::HookMessage, file::FileHandler, tcp::HookMessageTcp};
 
 mod common;
+mod connection;
 mod detour;
 mod error;
 mod file;
@@ -100,9 +101,7 @@ fn before_init() {
         let config = std::env::var("MIRRORD_CONFIG_FILE")
             .ok()
             .and_then(|val| val.parse::<PathBuf>().ok())
-            .map(|path| {
-                LayerFileConfig::from_path(&path).expect("error parsing mirrord config file")
-            })
+            .map(|path| LayerFileConfig::from_path(&path).unwrap())
             .unwrap_or_default()
             .generate_config();
 
@@ -111,29 +110,54 @@ fn before_init() {
                 let skip_processes = config.skip_processes.clone().map(VecOrSingle::to_vec);
 
                 if should_load(given_process, skip_processes) {
+                    deprecation_check(&config);
                     init(config);
                 }
             }
             Err(err) => {
-                eprintln!("mirrord config error: {}", err);
-
-                std::process::exit(-1);
+                panic!("Failed to load config: {}", err);
             }
         }
     }
 }
+
+// START | To be removed after deprecated functionality is removed
+fn deprecation_check(config: &LayerConfig) {
+    let LayerConfig {
+        target,
+        pod: PodConfig {
+            name, container, ..
+        },
+        ..
+    } = config;
+
+    match (target, name, container) {
+        (Some(_), Some(_), Some(_)) | (Some(_), Some(_), None) | (Some(_), None, Some(_)) => {
+            panic!("Conflicting EnvVars: Either of [MIRRORD_IMPERSONATED_TARGET], [MIRRORD_AGENT_IMPERSONATED_POD_NAME, MIRRORD_IMPERSONATED_CONTAINER_NAME] can't be set together
+            >> EnvVars: {:?}, {:?}, {:?}", target, name, container);
+        }
+        (None, None, _) => {
+            panic!("Missing EnvVar: either of [MIRRORD_IMPERSONATED_TARGET, MIRRORD_AGENT_IMPERSONATED_POD_NAME] must be set");
+        }
+        _ => {}
+    }
+}
+// END
 
 fn init(config: LayerConfig) {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
                 .with_thread_ids(true)
-                .with_span_events(FmtSpan::ACTIVE),
+                .with_span_events(FmtSpan::ACTIVE)
+                .compact(),
         )
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     info!("Initializing mirrord-layer!");
+
+    let full_preview = config.target.is_some() || config.pod.name.is_some();
 
     let (preview_update_tx, preview_update_rx) = channel(100);
 
@@ -141,56 +165,108 @@ fn init(config: LayerConfig) {
         RUNTIME.spawn(start_preview_connection(
             config.feature.preview.clone(),
             preview_update_rx,
-            config.pod.name.is_some(),
+            full_preview,
         ));
     }
 
-    let connection_port: u16 = rand::thread_rng().gen_range(30000..=65535);
+    if full_preview {
+        start_layer(config, preview_update_tx)
+    }
+}
 
-    if config.pod.name.is_some() {
-        info!("Using port `{connection_port:?}` for communication");
+fn start_layer(config: LayerConfig, preview_update_sender: Sender<UpdateMessage>) {
+    let connection = RUNTIME.block_on(connection::connect(&config));
 
-        let port_forwarder = RUNTIME
-        .block_on(pod_api::create_agent(config.clone(), connection_port))
-        .unwrap_or_else(|err| match err {
-            LayerError::KubeError(kube::Error::HyperError(err)) => {
-                eprintln!("\nmirrord encountered an error accessing the Kubernetes API. Consider passing --accept-invalid-certificates.\n");
+    let (sender, receiver) = channel::<HookMessage>(1000);
+    unsafe {
+        HOOK_SENDER = Some(sender);
+    };
 
-                match err.into_cause() {
-                    Some(cause) => panic!("{}", cause),
-                    None => panic!("mirrord got KubeError::HyperError"),
+    let enabled_file_ops = ENABLED_FILE_OPS
+        .get_or_init(|| config.feature.fs.is_read() || config.feature.fs.is_write());
+    ENABLED_FILE_RO_OPS
+        .set(config.feature.fs.is_read())
+        .expect("Setting ENABLED_FILE_RO_OPS singleton");
+    ENABLED_TCP_OUTGOING
+        .set(config.feature.network.outgoing.tcp)
+        .expect("Setting ENABLED_TCP_OUTGOING singleton");
+    ENABLED_UDP_OUTGOING
+        .set(config.feature.network.outgoing.udp)
+        .expect("Setting ENABLED_UDP_OUTGOING singleton");
+
+    enable_hooks(*enabled_file_ops, config.feature.network.dns);
+
+    RUNTIME.block_on(start_layer_thread(
+        connection,
+        receiver,
+        config,
+        preview_update_sender,
+    ));
+}
+
+/// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
+#[tracing::instrument(level = "trace", skip(preview_update_receiver))]
+async fn start_preview_connection(
+    config: mirrord_config::preview::PreviewConfig,
+    preview_update_receiver: Receiver<UpdateMessage>,
+    listen_for_updates: bool,
+) {
+    let config = PreviewConfig {
+        auth_server: config.auth_server,
+        server: config.server,
+        username: config.username,
+        allow_ports: config
+            .allow_ports
+            .and_then(|val| FilterPorts::from_str(&val.join(",")).ok()),
+        deny_ports: config
+            .deny_ports
+            .and_then(|val| FilterPorts::from_str(&val.join(",")).ok())
+            .unwrap_or_default(),
+        listen_for_updates,
+    };
+
+    let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;
+
+    match connection {
+        Ok(mut status) => {
+            while let Some(status) = status.recv().await {
+                trace!("start_preview_connection -> status {:?}", status);
+
+                match status {
+                    ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
+                    ConnectionStatus::Error(err) => {
+                        error!("start_preview_connection -> status error {}", err);
+                    }
+                    ConnectionStatus::Disconnected => {
+                        graceful_exit!();
+                    }
+                    _ => {}
                 }
             }
-            _ => panic!("failed to create agent: {}", err),
-        });
+        }
+        Err(err) => {
+            error!("start_preview_connection -> {}", err);
 
-        let (sender, receiver) = channel::<HookMessage>(1000);
-        unsafe {
-            HOOK_SENDER = Some(sender);
-        };
+            match err {
+                ConnectionError::Authentication(err) => match err {
+                    AuthenticationError::IoError(_) => {
+                        println!(
+                            "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
+                        );
+                    }
+                    AuthenticationError::ConfigParseError(_) => {
+                        println!(
+                            "mirrord-layer encountered an issue:\n\nAuthentication file is malformd,\n  please run 'mirrord login' to update authentication file.\n"
+                        );
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
 
-        let enabled_file_ops = ENABLED_FILE_OPS
-            .get_or_init(|| config.feature.fs.is_read() || config.feature.fs.is_write());
-        ENABLED_FILE_RO_OPS
-            .set(config.feature.fs.is_read())
-            .expect("Setting ENABLED_FILE_RO_OPS singleton");
-        ENABLED_TCP_OUTGOING
-            .set(config.feature.network.outgoing.tcp)
-            .expect("Setting ENABLED_TCP_OUTGOING singleton");
-        ENABLED_UDP_OUTGOING
-            .set(config.feature.network.outgoing.udp)
-            .expect("Setting ENABLED_UDP_OUTGOING singleton");
-
-        enable_hooks(*enabled_file_ops, config.feature.network.dns);
-
-        RUNTIME.block_on(start_layer_thread(
-            port_forwarder,
-            receiver,
-            config,
-            connection_port,
-            preview_update_tx,
-        ));
-    }
+            graceful_exit!();
+        }
+    };
 }
 
 fn should_load(given_process: &str, skip_processes: Option<Vec<String>>) -> bool {
@@ -220,7 +296,7 @@ where
 
     // Stores a list of `oneshot`s that communicates with the hook side (send a message from -layer
     // to -agent, and when we receive a message from -agent to -layer).
-    getaddrinfo_handler_queue: VecDeque<ResponseChannel<Vec<AddrInfoInternal>>>,
+    getaddrinfo_handler_queue: VecDeque<ResponseChannel<DnsLookup>>,
 
     pub tcp_steal_handler: TcpStealHandler,
 
@@ -288,17 +364,10 @@ where
             }
             HookMessage::GetAddrInfoHook(GetAddrInfoHook {
                 node,
-                service,
-                hints,
                 hook_channel_tx,
             }) => {
                 self.getaddrinfo_handler_queue.push_back(hook_channel_tx);
-
-                let request = ClientMessage::GetAddrInfoRequest(GetAddrInfoRequest {
-                    node,
-                    service,
-                    hints,
-                });
+                let request = ClientMessage::GetAddrInfoRequest(GetAddrInfoRequest { node });
 
                 self.codec.send(request).await.unwrap();
             }
@@ -352,7 +421,7 @@ where
                 .getaddrinfo_handler_queue
                 .pop_front()
                 .ok_or(LayerError::SendErrorGetAddrInfoResponse)?
-                .send(get_addr_info)
+                .send(get_addr_info.0)
                 .map_err(|_| LayerError::SendErrorGetAddrInfoResponse),
             DaemonMessage::Close => todo!(),
             DaemonMessage::LogMessage(_) => todo!(),
@@ -423,21 +492,20 @@ async fn thread_loop(
             }
         }
     }
+
+    graceful_exit!();
 }
 
-#[tracing::instrument(level = "trace", skip(pf, receiver))]
+#[tracing::instrument(level = "trace", skip(connection, receiver))]
 async fn start_layer_thread(
-    mut pf: Portforwarder,
+    connection: impl AsyncRead + AsyncWrite + Unpin + Send + 'static,
     receiver: Receiver<HookMessage>,
     config: LayerConfig,
-    connection_port: u16,
     preview_update_sender: Sender<UpdateMessage>,
 ) {
-    let port = pf.take_stream(connection_port).unwrap(); // TODO: Make port configurable
-
     // `codec` is used to retrieve messages from the daemon (messages that are sent from -agent to
     // -layer)
-    let mut codec = actix_codec::Framed::new(port, ClientCodec::new());
+    let mut codec = actix_codec::Framed::new(connection, ClientCodec::new());
 
     let (env_vars_filter, env_vars_select) = match (
         config.feature.env.exclude.map(|exclude| exclude.join(";")),
@@ -466,16 +534,26 @@ async fn start_layer_thread(
             }))
             .await;
 
-        let msg = codec.next().await;
-        if let Some(Ok(DaemonMessage::GetEnvVarsResponse(Ok(remote_env_vars)))) = msg {
-            trace!("DaemonMessage::GetEnvVarsResponse {:#?}!", remote_env_vars);
+        select! {
+          msg = codec.next() => {
+            if let Some(Ok(DaemonMessage::GetEnvVarsResponse(Ok(remote_env_vars)))) = msg {
+                trace!("DaemonMessage::GetEnvVarsResponse {:#?}!", remote_env_vars);
 
-            for (key, value) in remote_env_vars.into_iter() {
-                std::env::set_var(&key, &value);
-                debug_assert_eq!(std::env::var(key), Ok(value));
+                for (key, value) in remote_env_vars.into_iter() {
+                    std::env::set_var(&key, &value);
+                    debug_assert_eq!(std::env::var(key), Ok(value));
+                }
+            } else {
+                graceful_exit!("unexpected response - expected env vars response {msg:?}");
             }
-        } else {
-            panic!("unexpected response - expected env vars response {msg:?}");
+          },
+          _ = sleep(Duration::from_secs(config.agent.communication_timeout.unwrap_or(30).into())) => {
+            graceful_exit!(r#"
+                agent response timeout - expected env var response
+
+                check that the agent image can run on your architecture
+            "#);
+          }
         }
     };
 
@@ -485,78 +563,6 @@ async fn start_layer_thread(
         config.feature.network.incoming.is_steal(),
         preview_update_sender,
     ));
-}
-
-/// Start Preview Connection (behind `MIRRORD_PREVIEW` option).
-#[tracing::instrument(level = "trace", skip(preview_update_receiver))]
-async fn start_preview_connection(
-    config: mirrord_config::preview::PreviewConfig,
-    preview_update_receiver: Receiver<UpdateMessage>,
-    listen_for_updates: bool,
-) {
-    let mirrord_config::preview::PreviewConfig {
-        auth_server,
-        server,
-        username,
-        allow_ports,
-        deny_ports,
-        ..
-    } = config;
-
-    let config = PreviewConfig {
-        auth_server,
-        server,
-        username,
-        allow_ports: allow_ports.and_then(|val| FilterPorts::from_str(&val.join(",")).ok()),
-        deny_ports: deny_ports
-            .and_then(|val| FilterPorts::from_str(&val.join(",")).ok())
-            .unwrap_or_default(),
-        listen_for_updates,
-    };
-
-    let connection = mirrord_preview::client::connect(config, preview_update_receiver).await;
-
-    match connection {
-        Ok(mut status) => {
-            while let Some(status) = status.recv().await {
-                trace!("start_preview_connection -> status {:?}", status);
-
-                match status {
-                    ConnectionStatus::Connected(url) => println!("Preview URL {:?}", url),
-                    ConnectionStatus::Error(err) => {
-                        error!("start_preview_connection -> status error {}", err);
-                    }
-                    ConnectionStatus::Disconnected => {
-                        let _ =
-                            signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        Err(err) => {
-            error!("start_preview_connection -> {}", err);
-
-            match err {
-                ConnectionError::Authentication(err) => match err {
-                    AuthenticationError::IoError(_) => {
-                        println!(
-                            "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
-                        );
-                    }
-                    AuthenticationError::ConfigParseError(_) => {
-                        println!(
-                            "mirrord-layer encountered an issue:\n\nAuthentication file is malformd,\n  please run 'mirrord login' to update authentication file.\n"
-                        );
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-
-            let _ = signal::kill(Pid::from_raw(std::process::id() as i32), Signal::SIGTERM);
-        }
-    };
 }
 
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.
@@ -594,8 +600,7 @@ fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
 /// either let the `fd` bypass and call `libc::close` directly, or it might be a managed file `fd`,
 /// so it tries to do the same for files.
 #[hook_guard_fn]
-#[tracing::instrument(level = "trace")]
-unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
+pub(crate) unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
     let enabled_file_ops = ENABLED_FILE_OPS
         .get()
         .expect("Should be set during initialization!");
@@ -608,7 +613,7 @@ unsafe extern "C" fn close_detour(fd: c_int) -> c_int {
 
         close_file_result
             .map_err(|fail| {
-                error!("Failed writing file with {fail:#?}");
+                error!("Failed closing file with {fail:#?}");
                 -1
             })
             .unwrap_or_else(|fail| fail)
@@ -622,6 +627,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::pod_api::*;
 
     #[rstest]
     #[case("test", Some(vec!["foo".to_string()]))]
@@ -642,5 +648,30 @@ mod tests {
         #[case] skip_processes: Option<Vec<String>>,
     ) {
         assert!(!should_load(given_process, skip_processes));
+    }
+
+    #[rstest]
+    #[case("pod/foobaz", Target::Pod(PodData {pod_name: "foobaz".to_string(), container_name: None}))]
+    #[case("deployment/foobaz", Target::Deployment(DeploymentData {deployment: "foobaz".to_string()}))]
+    #[case("deployment/nginx-deployment", Target::Deployment(DeploymentData {deployment: "nginx-deployment".to_string()}))]
+    #[case("pod/foo/container/baz", Target::Pod(PodData { pod_name: "foo".to_string(), container_name: Some("baz".to_string()) }))]
+    fn test_target_parses(#[case] target: &str, #[case] expected: Target) {
+        let target = target.parse::<Target>().unwrap();
+        assert_eq!(target, expected)
+    }
+
+    #[rstest]
+    #[should_panic(expected = "InvalidTarget")]
+    #[case::panic("deployment/foobaz/blah")]
+    #[should_panic(expected = "InvalidTarget")]
+    #[case::panic("pod/foo/baz")]
+    fn test_target_parse_fails(#[case] target: &str) {
+        let target = target.parse::<pod_api::Target>().unwrap();
+        assert_eq!(
+            target,
+            Target::Deployment(DeploymentData {
+                deployment: "foobaz".to_string()
+            })
+        )
     }
 }
