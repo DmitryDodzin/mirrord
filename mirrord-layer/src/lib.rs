@@ -248,8 +248,8 @@ async fn start_preview_connection(
         Err(err) => {
             error!("start_preview_connection -> {}", err);
 
-            match err {
-                ConnectionError::Authentication(err) => match err {
+            if let ConnectionError::Authentication(err) = err {
+                match err {
                     AuthenticationError::IoError(_) => {
                         println!(
                             "mirrord-layer encountered an issue:\n\nCould not open authentication file,\n  please make sure it exists by running 'mirrord login'.\n",
@@ -261,8 +261,7 @@ async fn start_preview_connection(
                         );
                     }
                     _ => {}
-                },
-                _ => {}
+                }
             }
 
             graceful_exit!();

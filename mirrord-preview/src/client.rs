@@ -38,7 +38,7 @@ pub async fn connect(
     let auth_config = {
         let mut auth_config = AuthConfig::load()?;
 
-        if let Err(_) = auth_config.verify_async(&config.auth_server).await {
+        if auth_config.verify_async(&config.auth_server).await.is_err() {
             trace!(
                 "connect -> refresh_token -> auth_server {}",
                 &config.auth_server
