@@ -119,7 +119,7 @@ async fn select_env_vars(
         )
         .filter(|(key, _)| !default_filter.contains(key))
         // [("DB", "foo.db"), ("PORT", "99"), ("PATH", "/fake")]
-        .filter(|(key, _)| !filter_env_vars.contains(key))
+        .filter(|(key, _)| !filter_env_vars.contains(key) || !filter_env_vars.contains("*"))
         // [("DB", "foo.db"), ("PORT", "99")]
         .filter(|(key, _)| {
             select_env_vars.is_empty()
