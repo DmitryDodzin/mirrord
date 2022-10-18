@@ -11,6 +11,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Added
 - `pwrite` hook (used by `dotnet`);
+- Support passing `"*"` to `--override-env-vars-exclude`
 
 ### Fixed
 - Issue [#577](https://github.com/metalbear-co/mirrord/issues/577). Changed non-error logs from `error!` to `trace!`.
