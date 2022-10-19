@@ -19,6 +19,7 @@ mirrord-auth = { path = "../mirrord-auth" }
 mirrord-config = { path = "../mirrord-config"}
 mirrord-macro = { path = "../mirrord-macro" }
 mirrord-preview = { path = "../mirrord-preview", features = ["client"] }
+mirrord-progress = { path = "../mirrord-progress" }
 mirrord-protocol = { path = "../mirrord-protocol" }
 
 ctor = "0.1"

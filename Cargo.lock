@@ -741,6 +741,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fileops"
+version = "3.1.1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1601,13 +1608,14 @@ dependencies = [
 
 [[package]]
 name = "mirrord"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "anyhow",
  "clap 3.2.22",
  "exec",
  "mirrord-auth",
  "mirrord-layer",
+ "mirrord-progress",
  "rand 0.8.5",
  "regex",
  "reqwest",
@@ -1619,7 +1627,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-agent"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "actix-codec",
  "bollard",
@@ -1654,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-auth"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "rand 0.8.5",
  "reqwest",
@@ -1666,13 +1674,14 @@ dependencies = [
 
 [[package]]
 name = "mirrord-config"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "anyhow",
  "mirrord-auth",
  "mirrord-config-derive",
  "mirrord-macro",
  "rstest",
+ "schemars",
  "serde",
  "serde_json",
  "serde_yaml 0.9.13",
@@ -1682,7 +1691,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-config-derive"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -1692,7 +1701,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-layer"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "actix-codec",
  "anyhow",
@@ -1709,6 +1718,7 @@ dependencies = [
  "mirrord-config",
  "mirrord-macro",
  "mirrord-preview",
+ "mirrord-progress",
  "mirrord-protocol",
  "nix 0.24.2",
  "rand 0.8.5",
@@ -1730,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-macro"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1739,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-preview"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "async-stream",
  "bincode",
@@ -1754,8 +1764,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mirrord-progress"
+version = "3.1.1"
+dependencies = [
+ "atty",
+ "termspin",
+]
+
+[[package]]
 name = "mirrord-protocol"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "actix-codec",
  "bincode",
@@ -2715,7 +2733,7 @@ dependencies = [
 
 [[package]]
 name = "rust-e2e-fileops"
-version = "3.0.19-alpha"
+version = "3.1.1"
 dependencies = [
  "libc",
 ]
@@ -3166,6 +3184,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "termspin"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "057886b8a481f5e301215f35d67d93b65ddee0973a70594625bc6388de088cf7"
+dependencies = [
+ "downcast",
 ]
 
 [[package]]

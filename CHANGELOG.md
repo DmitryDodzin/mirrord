@@ -7,17 +7,83 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Changed
+- Update some texts in documentation, READMEs, and extension package descriptions
+## 3.1.1
+
+### Fixed
+- IntelliJ plugin crashing on run because both include and exclude were being set for env vars.
+
+## 3.1.0
+
 ### Added
-- Layer integration tests for more apps. Closes
-  [[#472](https://github.com/metalbear-co/mirrord/issues/472)].
+- `pwrite` hook (used by `dotnet`);
+
+### Fixed
+- Issue [#577](https://github.com/metalbear-co/mirrord/issues/577). Changed non-error logs from `error!` to `trace!`.
+
+### Changed
+- Agent pod definition now has `requests` specifications to avoid being defaulted to high values. See [#579](https://github.com/metalbear-co/mirrord/issues/579).
+- Change VSCode extension configuration to have file ops, outgoing traffic, DNS, and environment variables turned on by default.
+- update intelliJ extension: toggles + panel for include/exclude env vars
+
+## 3.0.22-alpha
+
+### Changed
+- Exclude internal configuration fields from generated schema.
+
+### Fixed
+- Issue [#531](https://github.com/metalbear-co/mirrord/issues/531). We now detect NixOS/Devbox usage and add `sh` to skipped list.
+
+## 3.0.21-alpha
+
+### Added
+- Reuse agent - first process that runs will create the agent and its children will be able to reuse the same one to avoid creating many agents.
+- Don't print progress for child processes to avoid confusion.
+- Skip istio/linkerd-proxy/init container when mirroring a pod without a specific container name.
+- Add "linkerd.io/inject": "disabled" annotation to pod created by mirrord to avoid linkerd auto inject.
+- mirrord-layer: support `-target deployment/deployment_name/container/container_name` flag to run on a specific container.
+- `/nix/*` path is now ignored for file operations to support NixOS.
+- Shortcut `deploy` for `deployment` in target argument.
+- Added the ability to override environment variables in the config file.
+
+
+### Changed
+- Print exit message when terminating application due to an unhandled error in the layer.
+- mirrord-layer: refactored `pod_api.rs` to be more maintainble.
+- Use kube config namespace by default.
+- mirrord-layer: Ignore `EAFNOSUPPORT` error reporting (valid scenario).
+
+## 3.0.20-alpha
+
+### Added
+- `pread` hook (used by `dotnet`);
+- mirrord-layer: ignore opening self-binary (temporal SDK calculates the hash of the binary, and it fails because it happens remotely)
+- Layer integration tests with more apps (testing with Go only on MacOS because of
+  known crash on Linux - [[#380](https://github.com/metalbear-co/mirrord/issues/380)]).
+  Closes [[#472](https://github.com/metalbear-co/mirrord/issues/472)].
+- Added progress reporting to the CLI.
+- CI: use [bors](https://bors.tech/) for merging! woohoo.
 
 ## Changed
 - Don't report InProgress io error as error (log as info)
-- Rename http mirroring tests from `integration` to `http_mirroring` since there are 
+- mirrord-layer: Added some `dotnet` files to `IGNORE_FILES` regex set;
+- mirrord-layer: Added the `Detour` type for use in the `ops` modules instead of `HookResult`. This type supports returning a `Bypass` to avoid manually checking if a hook actually failed or if we should just bypass it;
+- mirrord-protocol: Reduce duplicated types around `read` operation;
+- Layer integration tests for more apps. Closes
+  [[#472](https://github.com/metalbear-co/mirrord/issues/472)].
+- Rename http mirroring tests from `integration` to `http_mirroring` since there are
   now also integration tests in other files.
+- Delete useless `e2e_macos` CI job.
+- Integration tests also display test process output (with mirrord logs) when they
+  time out.
+- CI: mirrord-layer UT and integration run in same job.
+- .devcontainer: Added missing dependencies and also kind for running e2e tests.
 
 ### Fixed
 - Fix IntelliJ Extension artifact - use glob pattern
+- Use LabelSelector instead of app=* to select pods from deployments
+- Added another protection [to not execute in child processes from k8s auth](https://github.com/metalbear-co/mirrord/issues/531) by setting an env flag to avoid loading then removing it after executing the api.
 
 ## 3.0.19-alpha
 
@@ -50,7 +116,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## 3.0.14-alpha
 
 ### Added
-- Layer integration test. Tests the layer's loading and hooking in an http mirroring simulation with a flask web app. 
+- Layer integration test. Tests the layer's loading and hooking in an http mirroring simulation with a flask web app.
   Addresses but does not
   close [[#472](https://github.com/metalbear-co/mirrord/issues/472)] (more integration tests still needed).
 

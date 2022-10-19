@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
     io::{prelude::*, BufReader, SeekFrom},
+    os::unix::prelude::FileExt,
     path::PathBuf,
 };
 
@@ -10,8 +11,9 @@ use faccess::{AccessMode, PathExt};
 use mirrord_protocol::{
     AccessFileRequest, AccessFileResponse, CloseFileRequest, CloseFileResponse, FileRequest,
     FileResponse, OpenFileRequest, OpenFileResponse, OpenOptionsInternal, OpenRelativeFileRequest,
-    ReadFileRequest, ReadFileResponse, ReadLineFileRequest, ReadLineFileResponse, RemoteResult,
+    ReadFileRequest, ReadFileResponse, ReadLimitedFileRequest, ReadLineFileRequest, RemoteResult,
     ResponseError, SeekFileRequest, SeekFileResponse, WriteFileRequest, WriteFileResponse,
+    WriteLimitedFileRequest,
 };
 use tracing::{debug, error, trace};
 
@@ -56,14 +58,29 @@ impl FileManager {
                 let open_result = self.open_relative(relative_fd, path, open_options);
                 Ok(FileResponse::Open(open_result))
             }
-            FileRequest::Read(ReadFileRequest { fd, buffer_size }) => {
-                let read_result = self.read(fd, buffer_size);
+            FileRequest::Read(ReadFileRequest {
+                remote_fd,
+                buffer_size,
+            }) => {
+                let read_result = self.read(remote_fd, buffer_size);
                 Ok(FileResponse::Read(read_result))
             }
-            FileRequest::ReadLine(ReadLineFileRequest { fd, buffer_size }) => {
-                let read_result = self.read_line(fd, buffer_size);
+            FileRequest::ReadLine(ReadLineFileRequest {
+                remote_fd,
+                buffer_size,
+            }) => {
+                let read_result = self.read_line(remote_fd, buffer_size);
                 Ok(FileResponse::ReadLine(read_result))
             }
+            FileRequest::ReadLimited(ReadLimitedFileRequest {
+                remote_fd,
+                buffer_size,
+                start_from,
+            }) => Ok(FileResponse::ReadLimited(self.read_limited(
+                remote_fd,
+                buffer_size,
+                start_from,
+            ))),
             FileRequest::Seek(SeekFileRequest { fd, seek_from }) => {
                 let seek_result = self.seek(fd, seek_from.into());
                 Ok(FileResponse::Seek(seek_result))
@@ -71,6 +88,14 @@ impl FileManager {
             FileRequest::Write(WriteFileRequest { fd, write_bytes }) => {
                 let write_result = self.write(fd, write_bytes);
                 Ok(FileResponse::Write(write_result))
+            }
+            FileRequest::WriteLimited(WriteLimitedFileRequest {
+                remote_fd,
+                start_from,
+                write_bytes,
+            }) => {
+                let write_result = self.write_limited(remote_fd, start_from, write_bytes);
+                Ok(FileResponse::WriteLimited(write_result))
             }
             FileRequest::Close(CloseFileRequest { fd }) => {
                 let close_result = self.close(fd);
@@ -200,7 +225,7 @@ impl FileManager {
         &mut self,
         fd: usize,
         buffer_size: usize,
-    ) -> RemoteResult<ReadLineFileResponse> {
+    ) -> RemoteResult<ReadFileResponse> {
         self.open_files
             .get_mut(&fd)
             .ok_or(ResponseError::NotFound(fd))
@@ -225,7 +250,7 @@ impl FileManager {
 
                             // We handle the extra bytes in the `fgets` hook, so here we can just
                             // return the full buffer.
-                            let response = ReadLineFileResponse {
+                            let response = ReadFileResponse {
                                 bytes: buffer.into_bytes(),
                                 read_amount,
                             };
@@ -234,6 +259,59 @@ impl FileManager {
                         })?;
 
                     Ok(read_result)
+                } else {
+                    Err(ResponseError::NotFile(fd))
+                }
+            })
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub(crate) fn read_limited(
+        &mut self,
+        fd: usize,
+        buffer_size: usize,
+        start_from: u64,
+    ) -> RemoteResult<ReadFileResponse> {
+        self.open_files
+            .get_mut(&fd)
+            .ok_or(ResponseError::NotFound(fd))
+            .and_then(|remote_file| {
+                if let RemoteFile::File(file) = remote_file {
+                    let mut buffer = vec![0; buffer_size];
+
+                    let read_result = file.read_at(&mut buffer, start_from).map(|read_amount| {
+                        // We handle the extra bytes in the `pread` hook, so here we can just
+                        // return the full buffer.
+                        ReadFileResponse {
+                            bytes: buffer,
+                            read_amount,
+                        }
+                    })?;
+
+                    Ok(read_result)
+                } else {
+                    Err(ResponseError::NotFile(fd))
+                }
+            })
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub(crate) fn write_limited(
+        &mut self,
+        fd: usize,
+        start_from: u64,
+        buffer: Vec<u8>,
+    ) -> RemoteResult<WriteFileResponse> {
+        self.open_files
+            .get_mut(&fd)
+            .ok_or(ResponseError::NotFound(fd))
+            .and_then(|remote_file| {
+                if let RemoteFile::File(file) = remote_file {
+                    let written_amount = file
+                        .write_at(&buffer, start_from)
+                        .map(|written_amount| WriteFileResponse { written_amount })?;
+
+                    Ok(written_amount)
                 } else {
                     Err(ResponseError::NotFile(fd))
                 }

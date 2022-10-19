@@ -25,6 +25,7 @@ use crate::{
 
 /// This is the root struct for mirrord-layer's configuration
 #[derive(MirrordConfig, Deserialize, Default, PartialEq, Eq, Clone, Debug)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 #[config(map_to = LayerConfig)]
 pub struct LayerFileConfig {
@@ -37,12 +38,23 @@ pub struct LayerFileConfig {
     #[config(env = "MIRRORD_IMPERSONATED_TARGET")]
     pub target: Option<String>,
 
-    #[config(env = "MIRRORD_TARGET_NAMESPACE", default = "default")]
+    #[config(env = "MIRRORD_TARGET_NAMESPACE")]
     pub target_namespace: Option<String>,
 
+    #[cfg_attr(feature = "schema", schemars(skip))]
     /// IP:PORT to connect to instead of using k8s api, for testing purposes.
     #[config(env = "MIRRORD_CONNECT_TCP")]
     pub connect_tcp: Option<String>,
+
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    /// Agent name that already exists that we can connect to.
+    #[config(env = "MIRRORD_CONNECT_AGENT")]
+    pub connect_agent_name: Option<String>,
+
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    /// Agent listen port that already exists that we can connect to.
+    #[config(env = "MIRRORD_CONNECT_PORT")]
+    pub connect_agent_port: Option<u16>,
 
     #[serde(default)]
     #[config(nested)]
@@ -232,6 +244,8 @@ mod tests {
 
         let expect = LayerFileConfig {
             accept_invalid_certificates: Some(false),
+            connect_agent_name: None,
+            connect_agent_port: None,
             target: Some("pod/test-service-abcdefg-abcd".to_owned()),
             target_namespace: Some("default".to_owned()),
             skip_processes: None,
@@ -266,5 +280,20 @@ mod tests {
         };
 
         assert_eq!(config, expect);
+    }
+
+    /// Helper for printing the config schema.
+    ///
+    /// Run it with:
+    ///
+    /// ```sh
+    /// cargo test -p mirrord-config print_schema --features schema -- --ignored --nocapture
+    /// ```
+    #[cfg(feature = "schema")]
+    #[test]
+    #[ignore]
+    fn print_schema() {
+        let schema = schemars::schema_for!(LayerFileConfig);
+        println!("{}", serde_json::to_string_pretty(&schema).unwrap());
     }
 }

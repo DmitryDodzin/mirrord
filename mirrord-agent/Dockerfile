@@ -14,6 +14,7 @@ COPY mirrord-macro /app/mirrord-macro
 COPY mirrord-preview /app/mirrord-preview
 COPY mirrord-layer /app/mirrord-layer
 COPY mirrord-cli /app/mirrord-cli
+COPY mirrord-progress /app/mirrord-progress
 COPY tests /app/tests
 COPY .cargo /app/.cargo
 COPY mirrord-agent/platform.sh .

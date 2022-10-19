@@ -26,14 +26,21 @@ pub struct LogMessage {
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct ReadFileRequest {
-    pub fd: usize,
+    pub remote_fd: usize,
     pub buffer_size: usize,
 }
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct ReadLineFileRequest {
-    pub fd: usize,
+    pub remote_fd: usize,
     pub buffer_size: usize,
+}
+
+#[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
+pub struct ReadLimitedFileRequest {
+    pub remote_fd: usize,
+    pub buffer_size: usize,
+    pub start_from: u64,
 }
 
 // TODO: We're not handling `custom_flags` here, if we ever need to do so, add them here (it's an OS
@@ -130,6 +137,13 @@ pub struct WriteFileRequest {
     pub write_bytes: Vec<u8>,
 }
 
+#[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
+pub struct WriteLimitedFileRequest {
+    pub remote_fd: usize,
+    pub start_from: u64,
+    pub write_bytes: Vec<u8>,
+}
+
 impl fmt::Debug for WriteFileRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WriteFileRequest")
@@ -162,8 +176,10 @@ pub enum FileRequest {
     OpenRelative(OpenRelativeFileRequest),
     Read(ReadFileRequest),
     ReadLine(ReadLineFileRequest),
+    ReadLimited(ReadLimitedFileRequest),
     Seek(SeekFileRequest),
     Write(WriteFileRequest),
+    WriteLimited(WriteLimitedFileRequest),
     Close(CloseFileRequest),
     Access(AccessFileRequest),
 }
@@ -192,24 +208,9 @@ pub struct ReadFileResponse {
     pub read_amount: usize,
 }
 
-#[derive(Encode, Decode, PartialEq, Eq, Clone)]
-pub struct ReadLineFileResponse {
-    pub bytes: Vec<u8>,
-    pub read_amount: usize,
-}
-
 impl fmt::Debug for ReadFileResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReadFileResponse")
-            .field("bytes (length)", &self.bytes.len())
-            .field("read_amount", &self.read_amount)
-            .finish()
-    }
-}
-
-impl fmt::Debug for ReadLineFileResponse {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ReadLineFileResponse")
             .field("bytes (length)", &self.bytes.len())
             .field("read_amount", &self.read_amount)
             .finish()
@@ -239,9 +240,11 @@ pub type RemoteResult<T> = Result<T, ResponseError>;
 pub enum FileResponse {
     Open(RemoteResult<OpenFileResponse>),
     Read(RemoteResult<ReadFileResponse>),
-    ReadLine(RemoteResult<ReadLineFileResponse>),
-    Seek(RemoteResult<SeekFileResponse>),
+    ReadLine(RemoteResult<ReadFileResponse>),
+    ReadLimited(RemoteResult<ReadFileResponse>),
     Write(RemoteResult<WriteFileResponse>),
+    WriteLimited(RemoteResult<WriteFileResponse>),
+    Seek(RemoteResult<SeekFileResponse>),
     Close(RemoteResult<CloseFileResponse>),
     Access(RemoteResult<AccessFileResponse>),
 }

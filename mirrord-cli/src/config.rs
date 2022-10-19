@@ -38,6 +38,7 @@ pub(super) struct ExecArgs {
     pub pod_name: Option<String>,
 
     /// Namespace of the pod to mirror. Defaults to "default".
+    /// WARNING: [DEPRECATED] Consider using `--target-namespace` instead.
     #[clap(
         short = 'n',
         requires = "pod",
@@ -79,11 +80,11 @@ pub(super) struct ExecArgs {
     #[clap(long, value_parser)]
     pub no_remote_dns: bool,
 
-    /// Binary to execute and mirror traffic into.
+    /// Binary to execute and connect with the remote pod.
     #[clap(value_parser)]
     pub binary: String,
 
-    /// Binary to execute and mirror traffic into.
+    /// Binary to execute and connect with the remote pod.
     #[clap(long, value_parser)]
     pub skip_processes: Option<String>,
 

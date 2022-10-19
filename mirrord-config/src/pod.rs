@@ -5,13 +5,14 @@ use serde::Deserialize;
 use crate::config::source::MirrordConfigSource;
 
 #[derive(MirrordConfig, Deserialize, Default, PartialEq, Eq, Clone, Debug)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 #[config(map_to = PodConfig)]
 pub struct PodFileConfig {
     #[config(env = "MIRRORD_AGENT_IMPERSONATED_POD_NAME")]
     pub name: Option<String>,
 
-    #[config(env = "MIRRORD_AGENT_IMPERSONATED_POD_NAMESPACE", default = "default")]
+    #[config(env = "MIRRORD_AGENT_IMPERSONATED_POD_NAMESPACE")]
     pub namespace: Option<String>,
 
     #[config(env = "MIRRORD_IMPERSONATED_CONTAINER_NAME")]
@@ -28,9 +29,9 @@ mod tests {
     #[rstest]
     fn default(
         #[values((Some("pod"), Some("pod".to_string())))] name: (Option<&str>, Option<String>),
-        #[values((None, "default"), (Some("namespace"), "namespace"))] namespace: (
+        #[values((None, None), (Some("namespace"), Some("namespace".to_string())))] namespace: (
             Option<&str>,
-            &str,
+            Option<String>,
         ),
         #[values((None, None), (Some("container"), Some("container")))] container: (
             Option<&str>,
