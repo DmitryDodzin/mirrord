@@ -19,6 +19,7 @@ pub struct ConfigFlags {
     pub nested: bool,
     pub toggleable: bool,
     pub generator: Option<Ident>,
+    pub simplify: Option<Ident>,
 }
 
 impl ConfigFlags {
@@ -103,6 +104,23 @@ impl ConfigFlags {
                             match meta.lit {
                                 Lit::Str(val) => {
                                     flags.generator =
+                                        Some(Ident::new(&val.value(), Span::call_site()))
+                                }
+                                _ => {
+                                    return Err(meta
+                                        .lit
+                                        .span()
+                                        .error("derive should be a string literal as value"))
+                                }
+                            }
+                        }
+                        NestedMeta::Meta(Meta::NameValue(meta))
+                            if mode == ConfigFlagsType::Container
+                                && meta.path.is_ident("simplify") =>
+                        {
+                            match meta.lit {
+                                Lit::Str(val) => {
+                                    flags.simplify =
                                         Some(Ident::new(&val.value(), Span::call_site()))
                                 }
                                 _ => {
