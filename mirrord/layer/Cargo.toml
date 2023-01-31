@@ -72,7 +72,7 @@ hyper = "0.14"
 rstest = "*"
 test-cdylib = "*"
 tower = "0.4"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros", "process"] }
+# tokio = { workspace = true, features = ["process"] }
 
 [lib]
 crate_type = ["cdylib"]
