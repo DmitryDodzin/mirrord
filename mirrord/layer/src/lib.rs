@@ -28,7 +28,7 @@ use ctor::ctor;
 use error::{LayerError, Result};
 use file::{filter::FileFilter, OPEN_FILES};
 use hooks::HookManager;
-use libc::c_int;
+use libc::{c_int, sighandler_t};
 use mirrord_config::{
     feature::FeatureConfig,
     fs::FsConfig,
@@ -239,6 +239,17 @@ fn layer_start(config: LayerConfig) {
             .with(tracing_subscriber::EnvFilter::from_default_env())
             .init();
     };
+    let mut hook_manager = HookManager::default();
+
+    unsafe {
+        replace!(
+            &mut hook_manager,
+            "signal",
+            signal_detour,
+            FnSignal,
+            FN_SIGNAL
+        );
+    }
 
     info!("Initializing mirrord-layer!");
 
@@ -259,7 +270,11 @@ fn layer_start(config: LayerConfig) {
 
     FILE_FILTER.get_or_init(|| FileFilter::new(config.feature.fs.clone()));
 
-    enable_hooks(file_mode.is_active(), config.feature.network.dns);
+    enable_hooks(
+        hook_manager,
+        file_mode.is_active(),
+        config.feature.network.dns,
+    );
 
     RUNTIME.block_on(start_layer_thread(tx, rx, receiver, config));
 }
@@ -509,10 +524,8 @@ async fn start_layer_thread(
 }
 
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.
-#[tracing::instrument(level = "trace")]
-fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
-    let mut hook_manager = HookManager::default();
-
+#[tracing::instrument(level = "trace", skip(hook_manager))]
+fn enable_hooks(mut hook_manager: HookManager, enabled_file_ops: bool, enabled_remote_dns: bool) {
     unsafe {
         replace!(&mut hook_manager, "close", close_detour, FnClose, FN_CLOSE);
         replace!(
@@ -592,6 +605,15 @@ pub(crate) unsafe extern "C" fn close_nocancel_detour(fd: c_int) -> c_int {
 pub(crate) unsafe extern "C" fn uv_fs_close(a: usize, b: usize, fd: c_int, c: usize) -> c_int {
     close_layer_fd(fd);
     FN_UV_FS_CLOSE(a, b, fd, c)
+}
+
+#[hook_fn]
+#[tracing::instrument(level = "info", ret)]
+pub(crate) unsafe extern "C" fn signal_detour(
+    signum: c_int,
+    handler: sighandler_t,
+) -> sighandler_t {
+    FN_SIGNAL(signum, handler)
 }
 
 pub(crate) const FAIL_STILL_STUCK: &str = r#"
