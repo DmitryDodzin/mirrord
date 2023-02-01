@@ -28,7 +28,7 @@ use ctor::ctor;
 use error::{LayerError, Result};
 use file::{filter::FileFilter, OPEN_FILES};
 use hooks::HookManager;
-use libc::{c_int, sighandler_t};
+use libc::c_int;
 use mirrord_config::{
     feature::FeatureConfig,
     fs::FsConfig,
@@ -62,6 +62,7 @@ use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 use crate::{
     common::HookMessage,
     file::{filter::FILE_FILTER, FileHandler},
+    load::LoadType,
 };
 
 mod common;
@@ -72,6 +73,7 @@ mod error;
 mod exec;
 mod file;
 mod hooks;
+mod load;
 mod macros;
 mod outgoing;
 mod socket;
@@ -179,21 +181,33 @@ fn layer_pre_initialization() -> Result<(), LayerError> {
     let mut config = LayerConfig::from_env()?;
 
     nix_devbox_patch(&mut config);
-    let skip_processes = config.skip_processes.clone().map(VecOrSingle::to_vec);
 
-    if should_load(given_process, skip_processes) {
-        layer_start(config);
+    match load::load_type(given_process, config) {
+        LoadType::Full(config) => {
+            layer_start(*config);
 
-        if cfg!(target_arch = "x86_64") {
-            info!("Mounted {given_process} (x86_64)");
-        } else {
-            info!("Mounted {given_process} (arm64)");
+            if cfg!(target_arch = "x86_64") {
+                info!("Mounted {given_process} (x86_64)");
+            } else {
+                info!("Mounted {given_process} (arm64)");
+            }
         }
-    } else {
-        if cfg!(target_arch = "x86_64") {
-            info!("Skipped {given_process} (x86_64)");
-        } else {
-            info!("Skipped {given_process} (arm64)");
+        LoadType::Skipped => {
+            if cfg!(target_arch = "x86_64") {
+                info!("Skipped {given_process} (x86_64)");
+            } else {
+                info!("Skipped {given_process} (arm64)");
+            }
+        }
+        #[cfg(all(target_os = "macos", not(target_arch = "x86_64")))]
+        LoadType::SIPExec => {
+            sip_exec_layer_start();
+
+            if cfg!(target_arch = "x86_64") {
+                info!("SIPExec {given_process} (x86_64)");
+            } else {
+                info!("SIPExec {given_process} (arm64)");
+            }
         }
     }
 
@@ -251,17 +265,6 @@ fn layer_start(config: LayerConfig) {
             .with(tracing_subscriber::EnvFilter::from_default_env())
             .init();
     };
-    let mut hook_manager = HookManager::default();
-
-    unsafe {
-        replace!(
-            &mut hook_manager,
-            "signal",
-            signal_detour,
-            FnSignal,
-            FN_SIGNAL
-        );
-    }
 
     if cfg!(target_arch = "x86_64") {
         info!("Initializing mirrord-layer! (x86_64)");
@@ -286,21 +289,16 @@ fn layer_start(config: LayerConfig) {
 
     FILE_FILTER.get_or_init(|| FileFilter::new(config.feature.fs.clone()));
 
-    enable_hooks(
-        hook_manager,
-        file_mode.is_active(),
-        config.feature.network.dns,
-    );
+    enable_hooks(file_mode.is_active(), config.feature.network.dns);
 
     RUNTIME.block_on(start_layer_thread(tx, rx, receiver, config));
 }
 
-fn should_load(given_process: &str, skip_processes: Option<Vec<String>>) -> bool {
-    if let Some(processes_to_avoid) = skip_processes {
-        !processes_to_avoid.iter().any(|x| x == given_process)
-    } else {
-        true
-    }
+#[cfg(all(target_os = "macos", not(target_arch = "x86_64")))]
+fn sip_exec_layer_start() {
+    let mut hook_manager = HookManager::default();
+
+    unsafe { exec::enable_execve_hook(&mut hook_manager) };
 }
 
 struct Layer {
@@ -540,8 +538,10 @@ async fn start_layer_thread(
 }
 
 /// Enables file (behind `MIRRORD_FILE_OPS` option) and socket hooks.
-#[tracing::instrument(level = "trace", skip(hook_manager))]
-fn enable_hooks(mut hook_manager: HookManager, enabled_file_ops: bool, enabled_remote_dns: bool) {
+#[tracing::instrument(level = "trace")]
+fn enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
+    let mut hook_manager = HookManager::default();
+
     unsafe {
         replace!(&mut hook_manager, "close", close_detour, FnClose, FN_CLOSE);
         replace!(
@@ -623,15 +623,6 @@ pub(crate) unsafe extern "C" fn uv_fs_close(a: usize, b: usize, fd: c_int, c: us
     FN_UV_FS_CLOSE(a, b, fd, c)
 }
 
-#[hook_fn]
-#[tracing::instrument(level = "debug", ret)]
-pub(crate) unsafe extern "C" fn signal_detour(
-    signum: c_int,
-    handler: sighandler_t,
-) -> sighandler_t {
-    FN_SIGNAL(signum, handler)
-}
-
 pub(crate) const FAIL_STILL_STUCK: &str = r#"
 - If you're still stuck and everything looks fine:
 
@@ -640,31 +631,3 @@ pub(crate) const FAIL_STILL_STUCK: &str = r#"
 >> Or join our discord https://discord.com/invite/J5YSrStDKD and request help in #mirrord-help.
 
 "#;
-
-#[cfg(test)]
-mod tests {
-    use rstest::rstest;
-
-    use super::*;
-
-    #[rstest]
-    #[case("test", Some(vec!["foo".to_string()]))]
-    #[case("test", None)]
-    #[case("test", Some(vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()]))]
-    fn test_should_load_true(
-        #[case] given_process: &str,
-        #[case] skip_processes: Option<Vec<String>>,
-    ) {
-        assert!(should_load(given_process, skip_processes));
-    }
-
-    #[rstest]
-    #[case("test", Some(vec!["test".to_string()]))]
-    #[case("test", Some(vec!["test".to_owned(), "foo".to_owned(), "bar".to_owned(), "baz".to_owned()]))]
-    fn test_should_load_false(
-        #[case] given_process: &str,
-        #[case] skip_processes: Option<Vec<String>>,
-    ) {
-        assert!(!should_load(given_process, skip_processes));
-    }
-}
