@@ -183,6 +183,18 @@ fn layer_pre_initialization() -> Result<(), LayerError> {
 
     if should_load(given_process, skip_processes) {
         layer_start(config);
+
+        if cfg!(target_arch = "x86_64") {
+            info!("Mounted {given_process} (x86_64)");
+        } else {
+            info!("Mounted {given_process} (arm64)");
+        }
+    } else {
+        if cfg!(target_arch = "x86_64") {
+            info!("Skipped {given_process} (x86_64)");
+        } else {
+            info!("Skipped {given_process} (arm64)");
+        }
     }
 
     Ok(())
@@ -251,7 +263,11 @@ fn layer_start(config: LayerConfig) {
         );
     }
 
-    info!("Initializing mirrord-layer!");
+    if cfg!(target_arch = "x86_64") {
+        info!("Initializing mirrord-layer! (x86_64)");
+    } else {
+        info!("Initializing mirrord-layer! (arm64)");
+    }
 
     let (tx, rx) = RUNTIME.block_on(connection::connect(&config));
 
@@ -608,7 +624,7 @@ pub(crate) unsafe extern "C" fn uv_fs_close(a: usize, b: usize, fd: c_int, c: us
 }
 
 #[hook_fn]
-#[tracing::instrument(level = "info", ret)]
+#[tracing::instrument(level = "debug", ret)]
 pub(crate) unsafe extern "C" fn signal_detour(
     signum: c_int,
     handler: sighandler_t,
