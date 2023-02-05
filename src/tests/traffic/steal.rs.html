@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `tests/src/traffic/steal.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>steal.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-1d6438e53893d4f5.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-b8db113b98e15459.css"><link rel="stylesheet" disabled href="../../../static.files/dark-4b64df8497ac42b0.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-4939169e939b96f8.css"><script id="default-settings" ></script><script src="../../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../../static.files/source-script-5cf2e01a42cc9858.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-8f89a77f33748381.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../tests/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `tests/src/traffic/steal.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>steal.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f2fc7b5fd698d27d.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-5f7299aa2b503fb1.css"><link rel="stylesheet" disabled href="../../../static.files/dark-dfb18ef8114bb428.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-4047a6aaddd3789d.css"><script id="default-settings" ></script><script src="../../../static.files/storage-ff4706381ddb2707.js"></script><script defer src="../../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-02cbe07fc548e88c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../tests/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -323,24 +323,6 @@
 <a href="#323" id="323">323</a>
 <a href="#324" id="324">324</a>
 <a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-<a href="#328" id="328">328</a>
-<a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
-<a href="#336" id="336">336</a>
-<a href="#337" id="337">337</a>
-<a href="#338" id="338">338</a>
-<a href="#339" id="339">339</a>
-<a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
-<a href="#343" id="343">343</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>steal {
     <span class="kw">use </span>std::{
@@ -378,7 +360,9 @@
         <span class="kw">let </span>kube_client = kube_client.<span class="kw">await</span>;
         <span class="kw">let </span>url = get_service_url(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(flag) = agent.flag() {
+            flags.extend(flag)
+        }
         <span class="kw">let </span><span class="kw-2">mut </span>process = application
             .run(<span class="kw-2">&amp;</span>service.target, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>service.namespace), <span class="prelude-val">Some</span>(flags), <span class="prelude-val">None</span>)
             .<span class="kw">await</span>;
@@ -413,7 +397,9 @@
         <span class="kw">let </span>kube_client = kube_client.<span class="kw">await</span>;
         <span class="kw">let </span>url = get_service_url(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(flag) = agent.flag() {
+            flags.extend(flag)
+        }
 
         <span class="kw">let </span><span class="kw-2">mut </span>client = application
             .run(
@@ -459,7 +445,9 @@
         <span class="kw">let </span>url = get_service_url(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(flag) = agent.flag() {
+            flags.extend(flag)
+        }
         <span class="kw">let </span><span class="kw-2">mut </span>mirrorded_process = application
             .run(
                 <span class="kw-2">&amp;</span>service.target,
@@ -488,7 +476,7 @@
         <span class="comment">// Since the app exits on DELETE, if there&#39;s a bug and the DELETE was stolen even though it
         // was not supposed to, the app would now exit and the next request would fail.
 
-        // Send a DELETE that should not be matched and thus not stolen.
+        // Send a DELETE that should be matched and thus stolen, closing the app.
         </span><span class="kw">let </span>client = reqwest::Client::new();
         <span class="kw">let </span>req_builder = client.delete(<span class="kw-2">&amp;</span>url);
         <span class="kw">let </span><span class="kw-2">mut </span>headers = HeaderMap::default();
@@ -515,15 +503,17 @@
         <span class="attr">#[future] </span>tcp_echo_service: KubeService,
         <span class="attr">#[future] </span>kube_client: Client,
         <span class="attr">#[values(Agent::Job)] </span>agent: Agent,
+        <span class="attr">#[values(Application::PythonFastApiHTTP, Application::NodeHTTP)] </span>application: Application,
         <span class="attr">#[values(<span class="string">&quot;THIS IS NOT HTTP!\n&quot;</span>, <span class="string">&quot;short.\n&quot;</span>)] </span>tcp_data: <span class="kw-2">&amp;</span>str,
     ) {
-        <span class="kw">let </span>application = Application::NodeTcpEcho;
         <span class="kw">let </span>service = tcp_echo_service.<span class="kw">await</span>;
         <span class="kw">let </span>kube_client = kube_client.<span class="kw">await</span>;
         <span class="kw">let </span>(host, port) = get_service_host_and_port(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(flag) = agent.flag() {
+            flags.extend(flag)
+        }
         <span class="kw">let </span><span class="kw-2">mut </span>mirrorded_process = application
             .run(
                 <span class="kw-2">&amp;</span>service.target,
@@ -553,34 +543,20 @@
         </span><span class="kw">let </span>stdout_after = mirrorded_process.get_stdout();
         <span class="macro">assert!</span>(!stdout_after.contains(<span class="string">&quot;LOCAL APP GOT DATA&quot;</span>));
 
-        mirrorded_process.child.kill().<span class="kw">await</span>.unwrap();
+        <span class="comment">// Send a DELETE that should be matched and thus stolen, closing the app.
+        </span><span class="kw">let </span>url = get_service_url(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
+        <span class="kw">let </span>client = reqwest::Client::new();
+        <span class="kw">let </span>req_builder = client.delete(<span class="kw-2">&amp;</span>url);
+        <span class="kw">let </span><span class="kw-2">mut </span>headers = HeaderMap::default();
+        headers.insert(<span class="string">&quot;x-filter&quot;</span>, <span class="string">&quot;yes&quot;</span>.parse().unwrap()); <span class="comment">// header DOES match.
+        </span>send_request(req_builder, <span class="prelude-val">Some</span>(<span class="string">&quot;DELETE&quot;</span>), headers.clone()).<span class="kw">await</span>;
 
-        <span class="comment">// Wait for agent to exit.
-        </span>tokio::time::sleep(Duration::from_secs(<span class="number">3</span>)).<span class="kw">await</span>;
+        tokio::time::timeout(Duration::from_secs(<span class="number">10</span>), mirrorded_process.child.wait())
+            .<span class="kw">await
+            </span>.unwrap()
+            .unwrap();
 
-        <span class="comment">// Now do a meta-test to see that with this setup but without the http filter the data does
-        // reach the local app.
-
-        </span><span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
-        <span class="kw">let </span><span class="kw-2">mut </span>mirrorded_process = application
-            .run(<span class="kw-2">&amp;</span>service.target, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>service.namespace), <span class="prelude-val">Some</span>(flags), <span class="prelude-val">None</span>)
-            .<span class="kw">await</span>;
-
-        mirrorded_process.wait_for_line(Duration::from_secs(<span class="number">15</span>), <span class="string">&quot;daemon subscribed&quot;</span>);
-
-        <span class="kw">let </span><span class="kw-2">mut </span>stream = TcpStream::connect(addr).unwrap();
-        stream.write(tcp_data.as_bytes()).unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(stream);
-        <span class="kw">let </span><span class="kw-2">mut </span>buf = String::new();
-        reader.read_line(<span class="kw-2">&amp;mut </span>buf).unwrap();
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>buf[..<span class="number">7</span>], <span class="string">&quot;local: &quot;</span>); <span class="comment">// The data was stolen to local app.
-        </span><span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>buf[<span class="number">7</span>..], tcp_data); <span class="comment">// The correct data was sent there and back.
-
-        // Verify the data was sent to the local app.
-        </span><span class="kw">let </span>stdout_after = mirrorded_process.get_stdout();
-        <span class="macro">assert!</span>(stdout_after.contains(<span class="string">&quot;LOCAL APP GOT DATA&quot;</span>));
-        mirrorded_process.child.kill().<span class="kw">await</span>.unwrap();
+        application.assert(<span class="kw-2">&amp;</span>mirrorded_process);
     }
 
     <span class="doccomment">/// Test the case where running with `steal` set and an http header filter, we get an HTTP
@@ -595,6 +571,7 @@
         <span class="attr">#[future] </span>websocket_service: KubeService,
         <span class="attr">#[future] </span>kube_client: Client,
         <span class="attr">#[values(Agent::Job)] </span>agent: Agent,
+        <span class="attr">#[values(Application::PythonFastApiHTTP, Application::NodeHTTP)] </span>application: Application,
         <span class="attr">#[values(
             <span class="string">&quot;Hello, websocket!\n&quot;</span>.to_string(),
             <span class="string">&quot;websocket\n&quot;</span>.to_string()
@@ -603,13 +580,14 @@
     ) {
         <span class="kw">use </span>futures_util::{SinkExt, StreamExt};
 
-        <span class="kw">let </span>application = Application::NodeTcpEcho;
         <span class="kw">let </span>service = websocket_service.<span class="kw">await</span>;
         <span class="kw">let </span>kube_client = kube_client.<span class="kw">await</span>;
         <span class="kw">let </span>(host, port) = get_service_host_and_port(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(flag) = agent.flag() {
+            flags.extend(flag)
+        }
         <span class="kw">let </span><span class="kw-2">mut </span>mirrorded_process = application
             .run(
                 <span class="kw-2">&amp;</span>service.target,
@@ -654,35 +632,21 @@
         </span><span class="kw">let </span>stdout_after = mirrorded_process.get_stdout();
         <span class="macro">assert!</span>(!stdout_after.contains(<span class="string">&quot;LOCAL APP GOT DATA&quot;</span>));
 
-        mirrorded_process.child.kill().<span class="kw">await</span>.unwrap();
+        <span class="comment">// Send a DELETE that should be matched and thus stolen, closing the app.
+        </span><span class="kw">let </span>url = get_service_url(kube_client.clone(), <span class="kw-2">&amp;</span>service).<span class="kw">await</span>;
+        <span class="kw">let </span>client = reqwest::Client::new();
+        <span class="kw">let </span>req_builder = client.delete(<span class="kw-2">&amp;</span>url);
+        <span class="kw">let </span><span class="kw-2">mut </span>headers = HeaderMap::default();
+        headers.insert(<span class="string">&quot;x-filter&quot;</span>, <span class="string">&quot;yes&quot;</span>.parse().unwrap()); <span class="comment">// header DOES match.
+        </span>send_request(req_builder, <span class="prelude-val">Some</span>(<span class="string">&quot;DELETE&quot;</span>), headers.clone()).<span class="kw">await</span>;
 
-        <span class="comment">// Wait for agent to exit.
-        </span>tokio::time::sleep(Duration::from_secs(<span class="number">3</span>)).<span class="kw">await</span>;
+        tokio::time::timeout(Duration::from_secs(<span class="number">10</span>), mirrorded_process.child.wait())
+            .<span class="kw">await
+            </span>.unwrap()
+            .unwrap();
 
-        <span class="comment">// Now do a meta-test to see that with this setup but without the http filter the data does
-        // reach the local app.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>flags = <span class="macro">vec!</span>[<span class="string">&quot;--steal&quot;</span>];
-        agent.flag().map(|flag| flags.extend(flag));
-        <span class="kw">let </span><span class="kw-2">mut </span>mirrorded_process = application
-            .run(<span class="kw-2">&amp;</span>service.target, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>service.namespace), <span class="prelude-val">Some</span>(flags), <span class="prelude-val">None</span>)
-            .<span class="kw">await</span>;
-
-        mirrorded_process.wait_for_line(Duration::from_secs(<span class="number">15</span>), <span class="string">&quot;daemon subscribed&quot;</span>);
-
-        <span class="kw">let </span>addr = SocketAddr::new(host.trim().parse().unwrap(), port <span class="kw">as </span>u16);
-        <span class="kw">let </span><span class="kw-2">mut </span>stream = TcpStream::connect(addr).unwrap();
-        stream.write(write_data.as_bytes()).unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(stream);
-        <span class="kw">let </span><span class="kw-2">mut </span>buf = String::new();
-        reader.read_line(<span class="kw-2">&amp;mut </span>buf).unwrap();
-        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>buf[..<span class="number">7</span>], <span class="string">&quot;local: &quot;</span>); <span class="comment">// The data was stolen to local app.
-        </span><span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span>buf[<span class="number">7</span>..], write_data); <span class="comment">// The correct data was sent there and back.
-
-        // Verify the data was sent to the local app.
-        </span><span class="kw">let </span>stdout_after = mirrorded_process.get_stdout();
-        <span class="macro">assert!</span>(stdout_after.contains(<span class="string">&quot;LOCAL APP GOT DATA&quot;</span>));
-        mirrorded_process.child.kill().<span class="kw">await</span>.unwrap();
+        application.assert(<span class="kw-2">&amp;</span>mirrorded_process);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="tests" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (c5d82ed7a 2022-11-19)" data-search-js="search-df80cc3cb87b6482.js" data-settings-js="settings-7e1cf5cc683233f7.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>
+</section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="tests" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0-nightly (001a77fac 2023-01-30)" data-search-js="search-98d53477a794af0b.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-7c23ac01f615ce90.css" ></div></body></html>

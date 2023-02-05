@@ -258,7 +258,7 @@ var sourcesIndex = JSON.parse('{\
 "supports_color":["",[],["lib.rs"]],\
 "supports_hyperlinks":["",[],["lib.rs"]],\
 "supports_unicode":["",[],["lib.rs"]],\
-"syn":["",[["gen",[],["clone.rs","debug.rs","eq.rs","gen_helper.rs","hash.rs","visit.rs","visit_mut.rs"]]],["attr.rs","await.rs","bigint.rs","buffer.rs","custom_keyword.rs","custom_punctuation.rs","data.rs","derive.rs","discouraged.rs","drops.rs","error.rs","export.rs","expr.rs","ext.rs","file.rs","generics.rs","group.rs","ident.rs","item.rs","lib.rs","lifetime.rs","lit.rs","lookahead.rs","mac.rs","macros.rs","op.rs","parse.rs","parse_macro_input.rs","parse_quote.rs","pat.rs","path.rs","print.rs","punctuated.rs","reserved.rs","sealed.rs","span.rs","spanned.rs","stmt.rs","thread.rs","token.rs","tt.rs","ty.rs","verbatim.rs","whitespace.rs"]],\
+"syn":["",[["gen",[],["clone.rs","debug.rs","eq.rs","hash.rs","visit.rs","visit_mut.rs"]]],["attr.rs","await.rs","bigint.rs","buffer.rs","custom_keyword.rs","custom_punctuation.rs","data.rs","derive.rs","discouraged.rs","drops.rs","error.rs","export.rs","expr.rs","ext.rs","file.rs","gen_helper.rs","generics.rs","group.rs","ident.rs","item.rs","lib.rs","lifetime.rs","lit.rs","lookahead.rs","mac.rs","macros.rs","op.rs","parse.rs","parse_macro_input.rs","parse_quote.rs","pat.rs","path.rs","print.rs","punctuated.rs","reserved.rs","sealed.rs","span.rs","spanned.rs","stmt.rs","thread.rs","token.rs","tt.rs","ty.rs","verbatim.rs","whitespace.rs"]],\
 "sync_wrapper":["",[],["lib.rs"]],\
 "synstructure":["",[],["lib.rs","macros.rs"]],\
 "tempdir":["",[],["lib.rs"]],\
@@ -318,7 +318,7 @@ var sourcesIndex = JSON.parse('{\
 "virtue":["",[["generate",[],["gen_struct.rs","generate_fn.rs","generate_mod.rs","generator.rs","impl.rs","impl_for.rs","mod.rs","stream_builder.rs"]],["parse",[],["attributes.rs","body.rs","data_type.rs","generics.rs","mod.rs","utils.rs","visibility.rs"]]],["error.rs","lib.rs","utils.rs"]],\
 "want":["",[],["lib.rs"]],\
 "webbrowser":["",[],["lib.rs","unix.rs"]],\
-"webpki":["",[["name",[],["dns_name.rs","ip_address.rs","name.rs","verify.rs"]]],["calendar.rs","cert.rs","der.rs","end_entity.rs","error.rs","lib.rs","name.rs","signed_data.rs","time.rs","trust_anchor.rs","trust_anchor_util.rs","verify_cert.rs"]],\
+"webpki":["",[["name",[],["dns_name.rs","ip_address.rs","verify.rs"]]],["calendar.rs","cert.rs","der.rs","end_entity.rs","error.rs","lib.rs","name.rs","signed_data.rs","time.rs","trust_anchor.rs","verify_cert.rs"]],\
 "webpki_roots":["",[],["lib.rs"]],\
 "which":["",[],["checker.rs","error.rs","finder.rs","lib.rs"]],\
 "wildmatch":["",[],["lib.rs"]],\
