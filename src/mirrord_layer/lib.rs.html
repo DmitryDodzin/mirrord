@@ -844,35 +844,6 @@
 <a href="#844" id="844">844</a>
 <a href="#845" id="845">845</a>
 <a href="#846" id="846">846</a>
-<a href="#847" id="847">847</a>
-<a href="#848" id="848">848</a>
-<a href="#849" id="849">849</a>
-<a href="#850" id="850">850</a>
-<a href="#851" id="851">851</a>
-<a href="#852" id="852">852</a>
-<a href="#853" id="853">853</a>
-<a href="#854" id="854">854</a>
-<a href="#855" id="855">855</a>
-<a href="#856" id="856">856</a>
-<a href="#857" id="857">857</a>
-<a href="#858" id="858">858</a>
-<a href="#859" id="859">859</a>
-<a href="#860" id="860">860</a>
-<a href="#861" id="861">861</a>
-<a href="#862" id="862">862</a>
-<a href="#863" id="863">863</a>
-<a href="#864" id="864">864</a>
-<a href="#865" id="865">865</a>
-<a href="#866" id="866">866</a>
-<a href="#867" id="867">867</a>
-<a href="#868" id="868">868</a>
-<a href="#869" id="869">869</a>
-<a href="#870" id="870">870</a>
-<a href="#871" id="871">871</a>
-<a href="#872" id="872">872</a>
-<a href="#873" id="873">873</a>
-<a href="#874" id="874">874</a>
-<a href="#875" id="875">875</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -989,6 +960,7 @@
 <span class="kw">use crate</span>::{
     common::HookMessage,
     file::{filter::FILE_FILTER, FileHandler},
+    load::LoadType,
 };
 
 <span class="kw">mod </span>common;
@@ -1000,6 +972,7 @@
 </span><span class="kw">mod </span>exec;
 <span class="kw">mod </span>file;
 <span class="kw">mod </span>hooks;
+<span class="kw">mod </span>load;
 <span class="kw">mod </span>macros;
 <span class="kw">mod </span>outgoing;
 <span class="kw">mod </span>socket;
@@ -1142,10 +1115,12 @@
     <span class="kw">let </span><span class="kw-2">mut </span>config = LayerConfig::from_env()<span class="question-mark">?</span>;
 
     nix_devbox_patch(<span class="kw-2">&amp;mut </span>config);
-    <span class="kw">let </span>skip_processes = config.skip_processes.clone().map(VecOrSingle::to_vec);
 
-    <span class="kw">if </span>should_load(given_process, skip_processes) {
-        layer_start(config);
+    <span class="kw">match </span>load::load_type(given_process, config) {
+        LoadType::Full(config) =&gt; layer_start(<span class="kw-2">*</span>config),
+        <span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
+        </span>LoadType::SIPOnly =&gt; sip_only_layer_start(),
+        LoadType::Skip =&gt; {}
     }
 
     <span class="prelude-val">Ok</span>(())
@@ -1251,18 +1226,13 @@
     RUNTIME.block_on(start_layer_thread(tx, rx, receiver, config));
 }
 
-<span class="doccomment">/// Checks if mirrord-layer should load with the process named `given_process`.
-///
-/// ## Details
-///
-/// Some processes may start other processes (like an IDE launching a program to be debugged), and
-/// we don&#39;t want to hook mirrord-layer into those.
-</span><span class="kw">fn </span>should_load(given_process: <span class="kw-2">&amp;</span>str, skip_processes: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;) -&gt; bool {
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(processes_to_avoid) = skip_processes {
-        !processes_to_avoid.iter().any(|x| x == given_process)
-    } <span class="kw">else </span>{
-        <span class="bool-val">true
-    </span>}
+<span class="doccomment">/// We need to hook execve syscall to allow mirrord-layer to be loaded with sip patch when loading
+/// mirrord-layer on a process where specified to skip with MIRRORD_SKIP_PROCESSES
+</span><span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
+</span><span class="kw">fn </span>sip_only_layer_start() {
+    <span class="kw">let </span><span class="kw-2">mut </span>hook_manager = HookManager::default();
+
+    <span class="kw">unsafe </span>{ exec::enable_execve_hook(<span class="kw-2">&amp;mut </span>hook_manager) };
 }
 
 <span class="doccomment">/// Acts as an API to the various features of mirrord-layer, holding the actual feature handler
@@ -1720,33 +1690,5 @@
 &gt;&gt; Or join our discord https://discord.com/invite/J5YSrStDKD and request help in #mirrord-help.
 
 &quot;#</span>;
-
-<span class="attr">#[cfg(test)]
-</span><span class="kw">mod </span>tests {
-    <span class="kw">use </span>rstest::rstest;
-
-    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-
-    <span class="attr">#[rstest]
-    #[case(<span class="string">&quot;test&quot;</span>, <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[<span class="string">&quot;foo&quot;</span>.to_string()]</span>))]
-    <span class="attr">#[case(<span class="string">&quot;test&quot;</span>, <span class="prelude-val">None</span>)]
-    #[case(<span class="string">&quot;test&quot;</span>, <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[<span class="string">&quot;foo&quot;</span>.to_owned(), <span class="string">&quot;bar&quot;</span>.to_owned(), <span class="string">&quot;baz&quot;</span>.to_owned()]</span>))]
-    <span class="kw">fn </span>test_should_load_true(
-        <span class="attr">#[case] </span>given_process: <span class="kw-2">&amp;</span>str,
-        <span class="attr">#[case] </span>skip_processes: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
-    ) {
-        <span class="macro">assert!</span>(should_load(given_process, skip_processes));
-    }
-
-    <span class="attr">#[rstest]
-    #[case(<span class="string">&quot;test&quot;</span>, <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[<span class="string">&quot;test&quot;</span>.to_string()]</span>))]
-    <span class="attr">#[case(<span class="string">&quot;test&quot;</span>, <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[<span class="string">&quot;test&quot;</span>.to_owned(), <span class="string">&quot;foo&quot;</span>.to_owned(), <span class="string">&quot;bar&quot;</span>.to_owned(), <span class="string">&quot;baz&quot;</span>.to_owned()]</span>))]
-    <span class="kw">fn </span>test_should_load_false(
-        <span class="attr">#[case] </span>given_process: <span class="kw-2">&amp;</span>str,
-        <span class="attr">#[case] </span>skip_processes: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
-    ) {
-        <span class="macro">assert!</span>(!should_load(given_process, skip_processes));
-    }
-}
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mirrord_layer" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0-nightly (001a77fac 2023-01-30)" data-search-js="search-98d53477a794af0b.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-7c23ac01f615ce90.css" ></div></body></html>
