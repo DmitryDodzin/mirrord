@@ -371,6 +371,8 @@
 <a href="#371" id="371">371</a>
 <a href="#372" id="372">372</a>
 <a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
 </pre><pre class="rust"><code><span class="doccomment">/// Controls which files are ignored (open local) by mirrord file operations.
 ///
 /// There are 3 ways of setting this up:
@@ -468,12 +470,14 @@
 }
 
 <span class="doccomment">/// List of files that mirrord should use remotely read only
-/// Right now used to return &quot;file not exist&quot; for identity caches (AWS)
 </span><span class="kw">fn </span>generate_remote_ro_set() -&gt; RegexSet {
     <span class="kw">let </span>patterns = [
         <span class="comment">// AWS cli cache
-        // \.aws\/cli\/cache\/.+\.json
+        // &quot;file not exist&quot; for identity caches (AWS)
         </span><span class="string">r&quot;.aws/cli/cache/.+\.json$&quot;</span>,
+        <span class="comment">// for dns resolving
+        </span><span class="string">r&quot;^/etc/resolv.conf$&quot;</span>,
+        <span class="string">r&quot;^/etc/hosts$&quot;</span>,
     ];
     RegexSetBuilder::new(patterns)
         .case_insensitive(<span class="bool-val">true</span>)

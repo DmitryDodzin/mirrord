@@ -844,6 +844,7 @@
 <a href="#844" id="844">844</a>
 <a href="#845" id="845">845</a>
 <a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -1633,11 +1634,10 @@
         .is_active();
 
     <span class="comment">// Remove from sockets, or if not a socket, remove from files if file mode active
-    </span>SOCKETS.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd).is_none().then(|| {
-        <span class="kw">if </span>file_mode_active {
-            OPEN_FILES.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd);
-        }
-    });
+    </span><span class="kw">if </span>SOCKETS.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd).is_none() &amp;&amp; file_mode_active {
+        <span class="comment">// SOCKETS lock dropped, not holding it while locking OPEN_FILES.
+        </span>OPEN_FILES.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd);
+    }
 }
 
 <span class="comment">// TODO: When this is annotated with `hook_guard_fn`, then the outgoing sockets never call it (we
@@ -1677,7 +1677,9 @@
 </span><span class="attr">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
 #[hook_guard_fn]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>uv_fs_close(a: usize, b: usize, fd: c_int, c: usize) -&gt; c_int {
-    close_layer_fd(fd);
+    <span class="comment">// In this case we call `close_layer_fd` before the original close function, because execution
+    // does not return to here after calling `FN_UV_FS_CLOSE`.
+    </span>close_layer_fd(fd);
     FN_UV_FS_CLOSE(a, b, fd, c)
 }
 

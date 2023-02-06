@@ -800,6 +800,11 @@
 <a href="#800" id="800">800</a>
 <a href="#801" id="801">801</a>
 <a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
 </span><span class="kw">use </span>core::ffi::{c_size_t, c_ssize_t};
 <span class="doccomment">/// FFI functions that override the `libc` calls (see `file` module documentation on how to
@@ -842,7 +847,7 @@
     error::HookError,
     file::ops::{access, lseek, open, read, write},
     hooks::HookManager,
-    replace,
+    replace, FN_CLOSE,
 };
 
 <span class="doccomment">/// Implementation of open_detour, used in open_detour and openat_detour
@@ -1289,9 +1294,10 @@
 
 <span class="attr">#[hook_guard_fn]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>fclose_detour(file_stream: <span class="kw-2">*mut </span>FILE) -&gt; c_int {
-    <span class="kw">let </span>res = FN_FCLOSE(file_stream);
-    <span class="comment">// Extract the fd from stream and check if it&#39;s managed by us, or should be bypassed.
-    </span><span class="kw">let </span>fd = fileno_logic(file_stream);
+    <span class="kw">let </span>(res, fd) = <span class="kw">match </span>open_file_stream_fd(file_stream) {
+        <span class="prelude-val">Some</span>(local_fd) =&gt; (FN_CLOSE(local_fd), local_fd),
+        <span class="prelude-val">None </span>=&gt; (FN_FCLOSE(file_stream), fileno_logic(file_stream)),
+    };
 
     close_layer_fd(fd);
     res
@@ -1307,13 +1313,17 @@
 
 <span class="doccomment">/// Implementation of fileno_detour, used in fileno_detour and fread_detour
 </span><span class="kw">unsafe fn </span>fileno_logic(file_stream: <span class="kw-2">*mut </span>FILE) -&gt; c_int {
+    open_file_stream_fd(file_stream).unwrap_or_else(|| FN_FILENO(file_stream))
+}
+
+<span class="kw">unsafe fn </span>open_file_stream_fd(file_stream: <span class="kw-2">*mut </span>FILE) -&gt; <span class="prelude-ty">Option</span>&lt;RawFd&gt; {
     <span class="kw">let </span>local_fd = <span class="kw-2">*</span>(file_stream <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>);
 
-    <span class="kw">if </span>OPEN_FILES.lock().unwrap().contains_key(<span class="kw-2">&amp;</span>local_fd) {
-        local_fd
-    } <span class="kw">else </span>{
-        FN_FILENO(file_stream)
-    }
+    OPEN_FILES
+        .lock()
+        .unwrap()
+        .contains_key(<span class="kw-2">&amp;</span>local_fd)
+        .then_some(local_fd)
 }
 
 <span class="doccomment">/// Tries to convert input to type O, if it fails it returns the max value of O.

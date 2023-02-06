@@ -739,11 +739,6 @@
 <a href="#739" id="739">739</a>
 <a href="#740" id="740">740</a>
 <a href="#741" id="741">741</a>
-<a href="#742" id="742">742</a>
-<a href="#743" id="743">743</a>
-<a href="#744" id="744">744</a>
-<a href="#745" id="745">745</a>
-<a href="#746" id="746">746</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     <span class="self">self</span>,
     collections::{hash_map::Entry, HashMap},
@@ -1082,31 +1077,26 @@
             .ok_or(ResponseError::NotFound(fd))
             .and_then(|remote_file| {
                 <span class="kw">if let </span>RemoteFile::File(file) = remote_file {
-                    <span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(std::io::Read::by_ref(file));
-                    <span class="kw">let </span><span class="kw-2">mut </span>buffer = String::with_capacity(buffer_size <span class="kw">as </span>usize);
-                    <span class="kw">let </span>read_result = reader
-                        .read_line(<span class="kw-2">&amp;mut </span>buffer)
+                    <span class="kw">let </span>original_position = file.stream_position()<span class="question-mark">?</span>;
+                    <span class="comment">// limit bytes read using take
+                    </span><span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(std::io::Read::by_ref(file)).take(buffer_size);
+                    <span class="kw">let </span><span class="kw-2">mut </span>buffer = Vec::&lt;u8&gt;::with_capacity(buffer_size <span class="kw">as </span>usize);
+                    <span class="prelude-val">Ok</span>(reader
+                        .read_until(<span class="string">b&#39;\n&#39;</span>, <span class="kw-2">&amp;mut </span>buffer)
                         .and_then(|read_amount| {
-                            <span class="comment">// Take the new position to update the file&#39;s cursor position later.
-                            </span><span class="kw">let </span>position_after_read = reader.stream_position()<span class="question-mark">?</span>;
+                            <span class="comment">// Revert file to original position + bytes read (in case the
+                            // bufreader advanced too much)
+                            </span>file.seek(SeekFrom::Start(original_position + read_amount <span class="kw">as </span>u64))<span class="question-mark">?</span>;
 
-                            <span class="comment">// Limit the new position to `buffer_size`.
-                            </span><span class="prelude-val">Ok</span>((read_amount, position_after_read.clamp(<span class="number">0</span>, buffer_size)))
-                        })
-                        .and_then(|(read_amount, seek_to)| {
-                            file.seek(SeekFrom::Start(seek_to))<span class="question-mark">?</span>;
-
-                            <span class="comment">// We handle the extra bytes in the `fgets` hook, so here we can just
-                            // return the full buffer.
+                            <span class="comment">// We handle the extra bytes in the `fgets` hook, so here we can
+                            // just return the full buffer.
                             </span><span class="kw">let </span>response = ReadFileResponse {
-                                bytes: buffer.into_bytes(),
+                                bytes: buffer,
                                 read_amount: read_amount <span class="kw">as </span>u64,
                             };
 
                             <span class="prelude-val">Ok</span>(response)
-                        })<span class="question-mark">?</span>;
-
-                    <span class="prelude-val">Ok</span>(read_result)
+                        })<span class="question-mark">?</span>)
                 } <span class="kw">else </span>{
                     <span class="prelude-val">Err</span>(ResponseError::NotFile(fd))
                 }

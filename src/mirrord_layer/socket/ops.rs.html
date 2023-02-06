@@ -627,6 +627,7 @@
 <a href="#627" id="627">627</a>
 <a href="#628" id="628">628</a>
 <a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
 </pre><pre class="rust"><code><span class="kw">use </span>alloc::ffi::CString;
 <span class="kw">use </span>core::{ffi::CStr, mem};
 <span class="kw">use </span>std::{
@@ -726,8 +727,7 @@
         kind: socket_kind,
     };
 
-    <span class="kw">let </span><span class="kw-2">mut </span>sockets = SOCKETS.lock()<span class="question-mark">?</span>;
-    sockets.insert(socket_fd, Arc::new(new_socket));
+    SOCKETS.lock()<span class="question-mark">?</span>.insert(socket_fd, Arc::new(new_socket));
 
     Detour::Success(socket_fd)
 }
@@ -1133,13 +1133,15 @@
 
 <span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>dup(fd: c_int, dup_fd: i32) -&gt; <span class="prelude-ty">Result</span>&lt;(), HookError&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>sockets = SOCKETS.lock()<span class="question-mark">?</span>;
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(socket) = sockets.get(<span class="kw-2">&amp;</span>fd).cloned() {
-        sockets.insert(dup_fd <span class="kw">as </span>RawFd, socket);
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
-    }
+    {
+        <span class="kw">let </span><span class="kw-2">mut </span>sockets = SOCKETS.lock()<span class="question-mark">?</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(socket) = sockets.get(<span class="kw-2">&amp;</span>fd).cloned() {
+            sockets.insert(dup_fd <span class="kw">as </span>RawFd, socket);
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+        }
+    } <span class="comment">// Drop sockets, free Mutex.
 
-    <span class="kw">let </span><span class="kw-2">mut </span>files = OPEN_FILES.lock()<span class="question-mark">?</span>;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>files = OPEN_FILES.lock()<span class="question-mark">?</span>;
     <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = files.get(<span class="kw-2">&amp;</span>fd).cloned() {
         files.insert(dup_fd <span class="kw">as </span>RawFd, file);
     }
