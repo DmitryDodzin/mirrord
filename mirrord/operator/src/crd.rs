@@ -57,6 +57,14 @@ impl From<TargetCrd> for TargetConfig {
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub struct TargetStatus {
     ready: bool,
+    locks: Vec<TargetLock>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TargetLock {
+    PortSoft,
+    PortHard,
 }
 
 pub static OPERATOR_STATUS_NAME: &str = "operator";
