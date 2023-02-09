@@ -10,6 +10,7 @@ use mirrord_protocol::{ClientMessage, DaemonMessage};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
+use tracing::error;
 
 use crate::{crd::TargetCrd, error::OperatorError};
 
@@ -118,7 +119,7 @@ where
                     if let Some(client_message) = client_message {
                         if let Ok(payload) = bincode::encode_to_vec(client_message, bincode::config::standard()) {
                             if let Err(err) = connection.send(payload.into()).await {
-                                eprintln!("{err:?}");
+                                error!("{err:?}");
 
                                 break;
                             }
@@ -135,13 +136,13 @@ where
                             match daemon_result {
                                 Ok(daemon_message) => {
                                     if let Err(err) = daemon_tx.send(daemon_message).await {
-                                        eprintln!("{err:?}");
+                                        error!("{err:?}");
 
                                         break;
                                     }
                                 }
                                 Err(err) => {
-                                    eprintln!("{err:?}");
+                                    error!("{err}");
 
                                     break;
                                 }
