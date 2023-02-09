@@ -56,8 +56,8 @@ impl From<TargetCrd> for TargetConfig {
 }
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub struct TargetStatus {
-    ready: bool,
-    locks: Vec<TargetLock>,
+    pub ready: bool,
+    pub locks: Vec<TargetLock>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
