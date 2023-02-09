@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 
-use crate::crd::TargetCrd;
+use crate::{crd::TargetCrd, error::OperatorError};
 
 static CONNECTION_CHANNEL_SIZE: usize = 1000;
 
@@ -131,11 +131,20 @@ where
                 }
                 daemon_message = connection.next() => {
                     if let Some(Ok(Message::Binary(payload))) = daemon_message {
-                        if let Ok((daemon_message, _)) = bincode::decode_from_slice::<DaemonMessage, _>(&payload, bincode::config::standard()) {
-                            if let Err(err) = daemon_tx.send(daemon_message).await {
-                                eprintln!("{err:?}");
+                        if let Ok((daemon_result, _)) = bincode::decode_from_slice::<Result<DaemonMessage, OperatorError>, _>(&payload, bincode::config::standard()) {
+                            match daemon_result {
+                                Ok(daemon_message) => {
+                                    if let Err(err) = daemon_tx.send(daemon_message).await {
+                                        eprintln!("{err:?}");
 
-                                break;
+                                        break;
+                                    }
+                                }
+                                Err(err) => {
+                                    eprintln!("{err:?}");
+
+                                    break;
+                                }
                             }
                         } else {
                             break;

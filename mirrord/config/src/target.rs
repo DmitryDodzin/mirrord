@@ -49,6 +49,16 @@ impl Default for TargetFileConfig {
     }
 }
 
+impl fmt::Display for TargetConfig {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (&self.namespace, &self.path) {
+            (None, Some(path)) => path.fmt(fmt),
+            (Some(namespace), Some(path)) => write!(fmt, "{namespace}/{path}"),
+            _ => write!(fmt, "InvalidTargetConfig"),
+        }
+    }
+}
+
 impl FromMirrordConfig for TargetConfig {
     type Generator = TargetFileConfig;
 }
