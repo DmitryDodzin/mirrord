@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -151,6 +151,15 @@ impl FromStr for Target {
     }
 }
 
+impl fmt::Display for Target {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Target::Pod(pod) => pod.fmt(fmt),
+            Target::Deployment(deploy) => deploy.fmt(fmt),
+        }
+    }
+}
+
 /// Mirror the pod specified by [`PodTarget::pod`].
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash, Debug, JsonSchema)]
 pub struct PodTarget {
@@ -176,6 +185,15 @@ impl FromSplit for PodTarget {
             _ => Err(ConfigError::InvalidTarget(
                 FAIL_PARSE_DEPLOYMENT_OR_POD.to_string(),
             )),
+        }
+    }
+}
+
+impl fmt::Display for PodTarget {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.container {
+            Some(container) => write!(fmt, "pod/{}/container/{container}", self.pod),
+            None => write!(fmt, "pod/{}", self.pod),
         }
     }
 }
@@ -209,6 +227,15 @@ impl FromSplit for DeploymentTarget {
     }
 }
 
+impl fmt::Display for DeploymentTarget {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.container {
+            Some(container) => write!(fmt, "deployment/{}/container/{container}", self.deployment),
+            None => write!(fmt, "deployment/{}", self.deployment),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -234,5 +261,25 @@ mod tests {
                 assert_eq!(target.namespace.as_deref(), namespace.1);
             },
         );
+    }
+
+    #[rstest]
+    fn to_string(
+        #[values(true, false)] is_pod: bool,
+        #[values(None, Some("2000"))] container: Option<&str>,
+    ) {
+        let target = if is_pod {
+            Target::Pod(PodTarget {
+                pod: "foobar".to_owned(),
+                container: container.map(str::to_owned),
+            })
+        } else {
+            Target::Deployment(DeploymentTarget {
+                deployment: "foobar".to_owned(),
+                container: container.map(str::to_owned),
+            })
+        };
+
+        assert_eq!(target, target.to_string().parse().unwrap())
     }
 }
