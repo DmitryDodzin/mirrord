@@ -451,6 +451,12 @@
 <a href="#451" id="451">451</a>
 <a href="#452" id="452">452</a>
 <a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -574,6 +580,11 @@
     <span class="doccomment">/// Allow to lookup if operator is installed on cluster and use it
     </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_OPERATOR_ENABLE&quot;</span>, default = <span class="bool-val">true</span>)]
     </span><span class="kw">pub </span>operator: bool,
+
+    <span class="doccomment">/// Path to a kubeconfig file, if not specified, will use KUBECONFIG or ~/.kube/config or the
+    /// in-cluster config.
+    </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_KUBECONFIG&quot;</span>)]
+    </span><span class="kw">pub </span>kubeconfig: <span class="prelude-ty">Option</span>&lt;String&gt;,
 }
 
 <span class="kw">impl </span>LayerConfig {
@@ -771,6 +782,7 @@
 
         <span class="kw">let </span>expect = LayerFileConfig {
             accept_invalid_certificates: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
+            kubeconfig: <span class="prelude-val">None</span>,
             connect_agent_name: <span class="prelude-val">None</span>,
             connect_agent_port: <span class="prelude-val">None</span>,
             target: <span class="prelude-val">Some</span>(TargetFileConfig::Advanced {
