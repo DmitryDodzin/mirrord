@@ -6,6 +6,8 @@ pub mod client;
 #[cfg(feature = "crd")]
 pub mod crd;
 
+pub mod error;
+
 pub mod license;
 
 /// Operator Setup functinality

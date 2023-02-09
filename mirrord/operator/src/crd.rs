@@ -11,6 +11,7 @@ use crate::license::License;
     version = "v1",
     kind = "Target",
     struct = "TargetCrd",
+    status = "TargetStatus",
     namespaced
 )]
 pub struct TargetSpec {
@@ -52,6 +53,10 @@ impl From<TargetCrd> for TargetConfig {
             namespace: crd.metadata.namespace,
         }
     }
+}
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct TargetStatus {
+    ready: bool,
 }
 
 pub static OPERATOR_STATUS_NAME: &str = "operator";
