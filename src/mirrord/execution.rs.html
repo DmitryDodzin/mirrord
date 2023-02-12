@@ -117,12 +117,15 @@
 <a href="#117" id="117">117</a>
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{HashMap, HashSet},
     time::Duration,
 };
 
 <span class="kw">use </span>mirrord_config::LayerConfig;
+<span class="kw">use </span>mirrord_kube::api::MIRRORD_GUARDED_ENVS;
 <span class="kw">use </span>mirrord_progress::Progress;
 <span class="kw">use </span>mirrord_protocol::{ClientMessage, DaemonMessage, EnvVars, GetEnvVarsRequest};
 <span class="kw">use </span>serde::Serialize;
@@ -216,6 +219,11 @@
             env_vars.insert(INJECTION_ENV_VAR.to_string(), lib_path)
         };
 
+        <span class="comment">// Propogate env guard to extension
+        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(guard) = std::env::var(MIRRORD_GUARDED_ENVS) {
+            env_vars.insert(MIRRORD_GUARDED_ENVS.to_string(), guard);
+        }
+
         <span class="comment">// Depending on how we plan to connect to the agent, we do different things.
         // 1. if no operator, then we provide name and port so layer can port forward to
         // 2. if operator, then we provide nothing as layer will find it on its own.
@@ -226,10 +234,6 @@
             }
             AgentConnectInfo::Operator =&gt; {}
         };
-
-        <span class="comment">// Let layer know we already brought env var for it. Remove after removing that part from
-        // there.
-        </span>env_vars.insert(<span class="string">&quot;MIRRORD_EXTERNAL_ENV&quot;</span>.to_string(), <span class="string">&quot;true&quot;</span>.to_string());
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
             environment: env_vars,

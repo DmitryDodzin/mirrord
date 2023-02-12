@@ -140,6 +140,9 @@
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
 </pre><pre class="rust"><code><span class="kw">use </span>actix_codec::{AsyncRead, AsyncWrite};
 <span class="kw">use </span>async_trait::async_trait;
 <span class="kw">use </span>futures::{SinkExt, StreamExt};
@@ -158,6 +161,9 @@
 <span class="kw">pub mod </span>container;
 <span class="attr">#[cfg(feature = <span class="string">&quot;env_guard&quot;</span>)]
 </span><span class="kw">mod </span>env_guard;
+<span class="attr">#[cfg(feature = <span class="string">&quot;env_guard&quot;</span>)]
+</span><span class="kw">pub use </span>env_guard::MIRRORD_GUARDED_ENVS;
+
 <span class="kw">pub mod </span>kubernetes;
 <span class="kw">mod </span>runtime;
 

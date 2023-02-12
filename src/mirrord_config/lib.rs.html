@@ -457,6 +457,10 @@
 <a href="#457" id="457">457</a>
 <a href="#458" id="458">458</a>
 <a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -666,7 +670,8 @@
                             &quot;image_pull_policy&quot;: &quot;&quot;,
                             &quot;ttl&quot;: 60,
                             &quot;ephemeral&quot;: false,
-                            &quot;pause&quot;: false
+                            &quot;pause&quot;: false,
+                            &quot;flush_connections&quot;: false
                         },
                         &quot;feature&quot;: {
                             &quot;env&quot;: true,
@@ -701,6 +706,7 @@
                     ttl = 60
                     ephemeral = false
                     pause = false
+                    flush_connections = false
 
                     [feature]
                     env = true
@@ -732,6 +738,7 @@
                         ttl: 60
                         ephemeral: false
                         pause: false
+                        flush_connections: false
 
                     feature:
                         env: true
@@ -804,6 +811,7 @@
                 startup_timeout: <span class="prelude-val">None</span>,
                 network_interface: <span class="prelude-val">None</span>,
                 pause: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
+                flush_connections: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
             }),
             feature: <span class="prelude-val">Some</span>(FeatureFileConfig {
                 env: ToggleableConfig::Enabled(<span class="bool-val">true</span>).into(),

@@ -628,6 +628,9 @@
 <a href="#628" id="628">628</a>
 <a href="#629" id="629">629</a>
 <a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
 </pre><pre class="rust"><code><span class="kw">use </span>alloc::ffi::CString;
 <span class="kw">use </span>core::{ffi::CStr, mem};
 <span class="kw">use </span>std::{
@@ -651,7 +654,7 @@
     dns::GetAddrInfo,
     error::HookError,
     file::OPEN_FILES,
-    outgoing::{tcp::TcpOutgoing, udp::UdpOutgoing, Connect, MirrorAddress},
+    outgoing::{tcp::TcpOutgoing, udp::UdpOutgoing, Connect, RemoteConnection},
     port_debug_patch,
     tcp::{Listen, TcpIncoming},
     ENABLED_TCP_OUTGOING, ENABLED_UDP_OUTGOING,
@@ -894,7 +897,10 @@
     };
 
     blocking_send_hook_message(hook_message)<span class="question-mark">?</span>;
-    <span class="kw">let </span>MirrorAddress(mirror_address) = mirror_rx.blocking_recv()<span class="question-mark">??</span>;
+    <span class="kw">let </span>RemoteConnection {
+        mirror_address,
+        local_address,
+    } = mirror_rx.blocking_recv()<span class="question-mark">??</span>;
 
     <span class="kw">let </span>connect_to = SockAddr::from(mirror_address);
 
@@ -912,7 +918,7 @@
 
     <span class="kw">let </span>connected = Connected {
         remote_address,
-        mirror_address,
+        local_address,
     };
 
     Arc::get_mut(<span class="kw-2">&amp;mut </span>user_socket_info).unwrap().state = SocketState::Connected(connected);
@@ -1063,7 +1069,7 @@
             </span>.get(<span class="kw-2">&amp;</span>sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .and_then(|socket| <span class="kw">match </span><span class="kw-2">&amp;</span>socket.state {
-                SocketState::Connected(connected) =&gt; Detour::Success(connected.mirror_address),
+                SocketState::Connected(connected) =&gt; Detour::Success(connected.local_address),
                 SocketState::Bound(bound) =&gt; Detour::Success(bound.address),
                 SocketState::Listening(bound) =&gt; Detour::Success(bound.address),
                 <span class="kw">_ </span>=&gt; Detour::Bypass(Bypass::InvalidState(sockfd)),
@@ -1085,25 +1091,25 @@
     address_len: <span class="kw-2">*mut </span>socklen_t,
     new_fd: RawFd,
 ) -&gt; Detour&lt;RawFd&gt; {
-    <span class="kw">let </span>(local_address, domain, protocol, type_) = {
+    <span class="kw">let </span>(domain, protocol, type_) = {
         SOCKETS
             .lock()<span class="question-mark">?
             </span>.get(<span class="kw-2">&amp;</span>sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .and_then(|socket| <span class="kw">match </span><span class="kw-2">&amp;</span>socket.state {
-                SocketState::Listening(bound) =&gt; {
-                    Detour::Success((bound.address, socket.domain, socket.protocol, socket.type_))
+                SocketState::Listening(<span class="kw">_</span>) =&gt; {
+                    Detour::Success((socket.domain, socket.protocol, socket.type_))
                 }
                 <span class="kw">_ </span>=&gt; Detour::Bypass(Bypass::InvalidState(sockfd)),
             })<span class="question-mark">?
     </span>};
 
-    <span class="kw">let </span>remote_address = {
+    <span class="kw">let </span>(local_address, remote_address) = {
         CONNECTION_QUEUE
             .lock()<span class="question-mark">?
             </span>.get(<span class="kw-2">&amp;</span>sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
-            .map(|socket| socket.address)<span class="question-mark">?
+            .map(|socket| (socket.local_address, socket.remote_address))<span class="question-mark">?
     </span>};
 
     <span class="kw">let </span>new_socket = UserSocket {
@@ -1112,7 +1118,7 @@
         type_,
         state: SocketState::Connected(Connected {
             remote_address,
-            mirror_address: local_address,
+            local_address,
         }),
         kind: type_.try_into()<span class="question-mark">?</span>,
     };

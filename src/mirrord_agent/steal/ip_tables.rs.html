@@ -360,9 +360,34 @@
 <a href="#360" id="360">360</a>
 <a href="#361" id="361">361</a>
 <a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
 </pre><pre class="rust"><code><span class="kw">use </span>mirrord_protocol::Port;
 <span class="kw">use </span>nix::unistd::getgid;
 <span class="kw">use </span>rand::distributions::{Alphanumeric, DistString};
+<span class="kw">use </span>tokio::process::Command;
+<span class="kw">use </span>tracing::warn;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::{AgentError, <span class="prelude-ty">Result</span>};
 
@@ -424,6 +449,7 @@
     inner: IPT,
     chain_name: String,
     formatter: IPTableFormatter,
+    flush_connections: bool,
 }
 
 <span class="kw">const </span>IPTABLES_TABLE_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;nat&quot;</span>;
@@ -436,7 +462,7 @@
 <span class="kw">where
     </span>IPT: IPTables,
 {
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>new(ipt: IPT) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>new(ipt: IPT, flush_connections: bool) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
         <span class="kw">let </span>formatter = IPTableFormatter::detect(<span class="kw-2">&amp;</span>ipt)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>chain_name = <span class="self">Self</span>::get_chain_name();
@@ -449,6 +475,7 @@
             inner: ipt,
             chain_name,
             formatter,
+            flush_connections,
         })
     }
 
@@ -529,13 +556,32 @@
 
     <span class="doccomment">/// Adds port redirection, and bypass gid packets from iptables.
     </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>, skip(<span class="self">self</span>))]
-    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>add_stealer_iptables_rules(
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">async fn </span>add_stealer_iptables_rules(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         redirected_port: Port,
         target_port: Port,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="self">self</span>.add_redirect(redirected_port, target_port)
-            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.add_bypass_own_packets())
+            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.add_bypass_own_packets())<span class="question-mark">?</span>;
+
+        <span class="kw">if </span><span class="self">self</span>.flush_connections {
+            <span class="kw">let </span>conntrack = Command::new(<span class="string">&quot;conntrack&quot;</span>)
+                .args([
+                    <span class="string">&quot;--delete&quot;</span>,
+                    <span class="string">&quot;--proto&quot;</span>,
+                    <span class="string">&quot;tcp&quot;</span>,
+                    <span class="string">&quot;--orig-port-dst&quot;</span>,
+                    <span class="kw-2">&amp;</span>target_port.to_string(),
+                ])
+                .output()
+                .<span class="kw">await</span><span class="question-mark">?</span>;
+
+            <span class="kw">if </span>!conntrack.status.success() &amp;&amp; conntrack.status.code() != <span class="prelude-val">Some</span>(<span class="number">256</span>) {
+                <span class="macro">warn!</span>(<span class="string">&quot;`conntrack` output is {conntrack:#?}&quot;</span>);
+            }
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">/// Removes port redirection, and bypass gid packets from iptables.
@@ -663,7 +709,7 @@
             .times(<span class="number">1</span>)
             .returning(|<span class="kw">_</span>, <span class="kw">_</span>| <span class="prelude-val">Ok</span>(()));
 
-        <span class="kw">let </span>ipt = SafeIpTables::new(mock).expect(<span class="string">&quot;Create Failed&quot;</span>);
+        <span class="kw">let </span>ipt = SafeIpTables::new(mock, <span class="bool-val">false</span>).expect(<span class="string">&quot;Create Failed&quot;</span>);
 
         <span class="macro">assert!</span>(ipt.add_redirect(<span class="number">69</span>, <span class="number">420</span>).is_ok());
 
@@ -715,7 +761,7 @@
             .times(<span class="number">1</span>)
             .returning(|<span class="kw">_</span>, <span class="kw">_</span>| <span class="prelude-val">Ok</span>(()));
 
-        <span class="kw">let </span>ipt = SafeIpTables::new(mock).expect(<span class="string">&quot;Create Failed&quot;</span>);
+        <span class="kw">let </span>ipt = SafeIpTables::new(mock, <span class="bool-val">false</span>).expect(<span class="string">&quot;Create Failed&quot;</span>);
 
         <span class="macro">assert!</span>(ipt.add_redirect(<span class="number">69</span>, <span class="number">420</span>).is_ok());
 
