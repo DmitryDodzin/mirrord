@@ -168,10 +168,6 @@
 <a href="#168" id="168">168</a>
 <a href="#169" id="169">169</a>
 <a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;incluster&quot;</span>)]
 </span><span class="kw">use </span>std::time::Duration;
 
@@ -190,8 +186,6 @@
 <span class="kw">use </span>tokio::sync::mpsc;
 <span class="kw">use </span>tracing::{info, trace, warn};
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;env_guard&quot;</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::api::env_guard::EnvVarGuard;
 <span class="kw">use crate</span>::{
     api::{
         container::{ContainerApi, EphemeralContainer, JobContainer},
@@ -258,7 +252,7 @@
         .<span class="kw">await
         </span>.map_err(|<span class="kw">_</span>| KubeApiError::AgentReadyTimeout)<span class="question-mark">??</span>;
 
-        wrap_raw_connection(conn)
+        <span class="prelude-val">Ok</span>(wrap_raw_connection(conn))
     }
 
     <span class="attr">#[cfg(not(feature = <span class="string">&quot;incluster&quot;</span>))]
@@ -270,7 +264,11 @@
         <span class="macro">trace!</span>(<span class="string">&quot;port-forward to pod {}:{}&quot;</span>, <span class="kw-2">&amp;</span>pod_agent_name, <span class="kw-2">&amp;</span>agent_port);
         <span class="kw">let </span><span class="kw-2">mut </span>port_forwarder = pod_api.portforward(<span class="kw-2">&amp;</span>pod_agent_name, <span class="kw-2">&amp;</span>[agent_port]).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        wrap_raw_connection(port_forwarder.take_stream(agent_port).unwrap())
+        <span class="prelude-val">Ok</span>(wrap_raw_connection(
+            port_forwarder
+                .take_stream(agent_port)
+                .ok_or(KubeApiError::PortForwardFailed)<span class="question-mark">?</span>,
+        ))
     }
 
     <span class="kw">async fn </span>create_agent&lt;P&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, progress: <span class="kw-2">&amp;</span>P) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::AgentRef, <span class="self">Self</span>::Err&gt;
@@ -319,9 +317,6 @@
 }
 
 <span class="kw">pub async fn </span>create_kube_api(config: <span class="prelude-ty">Option</span>&lt;LayerConfig&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Client&gt; {
-    <span class="attr">#[cfg(feature = <span class="string">&quot;env_guard&quot;</span>)]
-    </span><span class="kw">let </span>_guard = EnvVarGuard::new();
-
     <span class="kw">let </span><span class="kw-2">mut </span>kube_config = Config::infer().<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">if let </span><span class="prelude-val">Some</span>(config) = config {
@@ -332,8 +327,7 @@
                     .<span class="kw">await</span><span class="question-mark">?</span>;
         }
 
-        <span class="attr">#[cfg_attr(not(feature = <span class="string">&quot;env_guard&quot;</span>), allow(unused_mut))]
-        </span><span class="kw">if </span>config.accept_invalid_certificates {
+        <span class="kw">if </span>config.accept_invalid_certificates {
             kube_config.accept_invalid_certs = <span class="bool-val">true</span>;
             <span class="comment">// Only warn the first time connecting to the agent, not on child processes.
             </span><span class="kw">if </span>config.connect_agent_name.is_none() {
@@ -341,8 +335,6 @@
             }
         }
     }
-    <span class="attr">#[cfg(feature = <span class="string">&quot;env_guard&quot;</span>)]
-    </span>_guard.prepare_config(<span class="kw-2">&amp;mut </span>kube_config);
 
     Client::try_from(kube_config).map_err(KubeApiError::from)
 }
