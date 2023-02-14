@@ -176,7 +176,7 @@ async fn exec(args: &ExecArgs, progress: &TaskProgress) -> Result<()> {
         }
     }
 
-    let execution_info = MirrordExecution::start(&config, progress).await?;
+    let (_intproxy, execution_info) = MirrordExecution::start(&config, progress).await?;
 
     // Stop confusion with layer
     std::env::set_var(mirrord_progress::MIRRORD_PROGRESS_ENV, "off");

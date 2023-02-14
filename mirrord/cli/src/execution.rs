@@ -8,8 +8,8 @@ use mirrord_progress::Progress;
 use mirrord_protocol::{ClientMessage, DaemonMessage, EnvVars, GetEnvVarsRequest};
 use serde::Serialize;
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    process::Command,
+    io::{AsyncBufReadExt, BufReader, Lines},
+    process::{ChildStdout, Command},
 };
 use tracing::trace;
 
@@ -34,7 +34,10 @@ pub(crate) struct MirrordExecution {
 }
 
 impl MirrordExecution {
-    pub(crate) async fn start<P>(config: &LayerConfig, progress: &P) -> Result<Self>
+    pub(crate) async fn start<P>(
+        config: &LayerConfig,
+        progress: &P,
+    ) -> Result<(Lines<BufReader<ChildStdout>>, Self)>
     where
         P: Progress + Send + Sync,
     {
@@ -121,12 +124,13 @@ impl MirrordExecution {
             .spawn()
             .map_err(CliError::InternalProxyExecutionFailed)?;
 
-        let stdout = proxy_process
+        let mut stdout = proxy_process
             .stdout
-            .ok_or(CliError::InternalProxyStdoutError)?;
+            .map(BufReader::new)
+            .ok_or(CliError::InternalProxyStdoutError)?
+            .lines();
 
-        let port: u16 = BufReader::new(stdout)
-            .lines()
+        let port: u16 = stdout
             .next_line()
             .await
             .map_err(CliError::InternalProxyReadError)?
@@ -140,8 +144,11 @@ impl MirrordExecution {
             format!("127.0.0.1:{port}"),
         );
 
-        Ok(Self {
-            environment: env_vars,
-        })
+        Ok((
+            stdout,
+            Self {
+                environment: env_vars,
+            },
+        ))
     }
 }
