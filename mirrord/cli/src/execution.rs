@@ -107,8 +107,7 @@ impl MirrordExecution {
 
         proxy_command
             .arg("intproxy")
-            .stdout(std::process::Stdio::piped())
-            .stdin(std::process::Stdio::null());
+            .stdout(std::process::Stdio::piped());
 
         match &connect_info {
             AgentConnectInfo::DirectKubernetes(name, port) => {

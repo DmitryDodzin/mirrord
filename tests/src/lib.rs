@@ -338,6 +338,7 @@ mod utils {
         // docker build -t test . -f mirrord/agent/Dockerfile
         // minikube load image test:latest
         let mut base_env = HashMap::new();
+        base_env.insert("MIRRORD_OPERATOR_ENABLE", "false");
         base_env.insert("MIRRORD_AGENT_IMAGE", "test");
         base_env.insert("MIRRORD_CHECK_VERSION", "false");
         base_env.insert("MIRRORD_AGENT_RUST_LOG", "warn,mirrord=trace");
