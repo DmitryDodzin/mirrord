@@ -406,6 +406,9 @@
 <a href="#406" id="406">406</a>
 <a href="#407" id="407">407</a>
 <a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, sync::LazyLock};
 
 <span class="kw">use </span>async_trait::async_trait;
@@ -590,6 +593,9 @@
                                 {
                                     <span class="string">&quot;sidecar.istio.io/inject&quot;</span>: <span class="string">&quot;false&quot;</span>,
                                     <span class="string">&quot;linkerd.io/inject&quot;</span>: <span class="string">&quot;disabled&quot;
+                                </span>},
+                                <span class="string">&quot;labels&quot;</span>: {
+                                    <span class="string">&quot;app&quot;</span>: <span class="string">&quot;mirrord&quot;
                                 </span>}
                             },
 

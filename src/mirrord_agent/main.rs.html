@@ -1158,14 +1158,14 @@
 
     <span class="kw">let </span>result = spawn_child_agent();
 
-    run_thread_in_namespace(
+    <span class="kw">let _ </span>= run_thread_in_namespace(
         clear_iptable_chain(chain_name),
         <span class="string">&quot;clear iptables&quot;</span>.to_owned(),
         pid,
         <span class="string">&quot;net&quot;</span>,
     )
     .join()
-    .map_err(|<span class="kw">_</span>| AgentError::JoinTask)<span class="question-mark">??</span>;
+    .map_err(|<span class="kw">_</span>| AgentError::JoinTask)<span class="question-mark">?</span>;
 
     result
 }
