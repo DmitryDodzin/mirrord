@@ -223,7 +223,9 @@ where
     IPT: IPTables,
 {
     fn drop(&mut self) {
-        Self::remove_chain(&self.inner, &self.formatter, &self.chain_name).unwrap();
+        if let Err(err) = Self::remove_chain(&self.inner, &self.formatter, &self.chain_name) {
+            warn!("Error Dropping SafeIpTables: {err}")
+        }
     }
 }
 
