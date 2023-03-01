@@ -847,6 +847,12 @@
 <a href="#847" id="847">847</a>
 <a href="#848" id="848">848</a>
 <a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -1323,18 +1329,24 @@
         <span class="kw">let </span>steal = incoming.is_steal();
         <span class="kw">let </span>IncomingConfig {
             http_header_filter: HttpHeaderFilterConfig { filter, ports },
+            port_mapping,
             ..
         } = incoming;
         <span class="self">Self </span>{
             tx,
             rx,
             ping: <span class="bool-val">false</span>,
-            tcp_mirror_handler: TcpMirrorHandler::default(),
+            tcp_mirror_handler: TcpMirrorHandler::new(port_mapping.clone()),
             tcp_outgoing_handler: TcpOutgoingHandler::default(),
             udp_outgoing_handler: Default::default(),
             file_handler: FileHandler::default(),
             getaddrinfo_handler_queue: VecDeque::new(),
-            tcp_steal_handler: TcpStealHandler::new(filter, ports.into(), http_response_sender),
+            tcp_steal_handler: TcpStealHandler::new(
+                filter,
+                ports.into(),
+                http_response_sender,
+                port_mapping,
+            ),
             http_response_receiver,
             steal,
         }

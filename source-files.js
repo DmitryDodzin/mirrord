@@ -15,6 +15,7 @@ var sourcesIndex = JSON.parse('{\
 "backoff":["",[],["backoff.rs","clock.rs","default.rs","error.rs","exponential.rs","lib.rs","retry.rs"]],\
 "backtrace":["",[["backtrace",[],["libunwind.rs","mod.rs"]],["symbolize",[["gimli",[],["elf.rs","libs_dl_iterate_phdr.rs","mmap_unix.rs","parse_running_mmaps_unix.rs","stash.rs"]]],["gimli.rs","mod.rs"]]],["capture.rs","lib.rs","print.rs","types.rs"]],\
 "base64":["",[["engine",[["general_purpose",[],["decode.rs","decode_suffix.rs","mod.rs"]]],["mod.rs"]],["read",[],["decoder.rs","mod.rs"]],["write",[],["encoder.rs","encoder_string_writer.rs","mod.rs"]]],["alphabet.rs","chunked_encoder.rs","decode.rs","display.rs","encode.rs","lib.rs","prelude.rs"]],\
+"bimap":["",[],["btree.rs","hash.rs","lib.rs","mem.rs"]],\
 "bincode":["",[["de",[],["decoder.rs","impl_core.rs","impl_tuples.rs","impls.rs","mod.rs","read.rs"]],["enc",[],["encoder.rs","impl_tuples.rs","impls.rs","mod.rs","write.rs"]],["features",[["serde",[],["de_borrowed.rs","de_owned.rs","mod.rs","ser.rs"]]],["derive.rs","impl_alloc.rs","impl_std.rs","mod.rs"]],["varint",[],["decode_signed.rs","decode_unsigned.rs","encode_signed.rs","encode_unsigned.rs","mod.rs"]]],["atomic.rs","config.rs","error.rs","lib.rs","utils.rs"]],\
 "bincode_derive":["",[],["attribute.rs","derive_enum.rs","derive_struct.rs","lib.rs"]],\
 "bit_set":["",[],["lib.rs"]],\

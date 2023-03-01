@@ -191,6 +191,35 @@
 <a href="#191" id="191">191</a>
 <a href="#192" id="192">192</a>
 <a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::File,
     os::unix::io::{IntoRawFd, RawFd},
@@ -324,23 +353,52 @@
     container_id: String,
 }
 
+<span class="doccomment">/// Connects to the given containerd socket
+/// and returns the client only if the given container
+/// exists.
+</span><span class="kw">async fn </span>connect_and_find_container(
+    container_id: String,
+    sock_path: <span class="kw">impl </span>AsRef&lt;std::path::Path&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;TasksClient&lt;Channel&gt;&gt; {
+    <span class="kw">let </span>channel = connect(sock_path).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>client = TasksClient::new(channel);
+    <span class="kw">let </span>request = GetRequest {
+        container_id,
+        ..Default::default()
+    };
+    <span class="kw">let </span>request = <span class="macro">with_namespace!</span>(request, DEFAULT_CONTAINERD_NAMESPACE);
+    client.get(request).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(client)
+}
+
 <span class="kw">impl </span>ContainerdContainer {
-    <span class="kw">async fn </span>get_client() -&gt; <span class="prelude-ty">Result</span>&lt;TasksClient&lt;Channel&gt;&gt; {
-        <span class="kw">let </span>channel = <span class="kw">match </span>connect(CONTAINERD_SOCK_PATH).<span class="kw">await </span>{
-            <span class="prelude-val">Ok</span>(channel) =&gt; channel,
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">match </span>connect(CONTAINERD_ALTERNATIVE_SOCK_PATH).<span class="kw">await </span>{
-                <span class="prelude-val">Ok</span>(channel) =&gt; channel,
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; connect(CONTAINERD_K3S_SOCK_PATH).<span class="kw">await</span><span class="question-mark">?</span>,
+    <span class="doccomment">/// Get the containerd client for a given container id.
+    /// This is useful since we might have more than one
+    /// containerd socket to use and we need to find the one
+    /// that manages our target container
+    </span><span class="kw">async fn </span>get_client(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;TasksClient&lt;Channel&gt;&gt; {
+        <span class="kw">match </span>connect_and_find_container(<span class="self">self</span>.container_id.clone(), CONTAINERD_SOCK_PATH).<span class="kw">await </span>{
+            <span class="prelude-val">Ok</span>(channel) =&gt; <span class="prelude-val">Ok</span>(channel),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">match </span>connect_and_find_container(
+                <span class="self">self</span>.container_id.clone(),
+                CONTAINERD_ALTERNATIVE_SOCK_PATH,
+            )
+            .<span class="kw">await
+            </span>{
+                <span class="prelude-val">Ok</span>(channel) =&gt; <span class="prelude-val">Ok</span>(channel),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                    connect_and_find_container(<span class="self">self</span>.container_id.clone(), CONTAINERD_K3S_SOCK_PATH)
+                        .<span class="kw">await
+                </span>}
             },
-        };
-        <span class="prelude-val">Ok</span>(TasksClient::new(channel))
+        }
     }
 }
 
 <span class="attr">#[async_trait]
 </span><span class="kw">impl </span>ContainerRuntime <span class="kw">for </span>ContainerdContainer {
     <span class="kw">async fn </span>get_pid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u64&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">Self</span>::get_client().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">self</span>.get_client().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>container_id = <span class="self">self</span>.container_id.to_string();
         <span class="kw">let </span>request = GetRequest {
             container_id,
@@ -358,7 +416,7 @@
     }
 
     <span class="kw">async fn </span>pause(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">Self</span>::get_client().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">self</span>.get_client().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>container_id = <span class="self">self</span>.container_id.to_string();
         <span class="kw">let </span>request = PauseTaskRequest { container_id };
         <span class="kw">let </span>request = <span class="macro">with_namespace!</span>(request, DEFAULT_CONTAINERD_NAMESPACE);
@@ -367,7 +425,7 @@
     }
 
     <span class="kw">async fn </span>unpause(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">Self</span>::get_client().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>client = <span class="self">self</span>.get_client().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>container_id = <span class="self">self</span>.container_id.to_string();
         <span class="kw">let </span>request = ResumeTaskRequest { container_id };
         <span class="kw">let </span>request = <span class="macro">with_namespace!</span>(request, DEFAULT_CONTAINERD_NAMESPACE);

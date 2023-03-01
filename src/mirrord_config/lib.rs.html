@@ -465,6 +465,7 @@
 <a href="#465" id="465">465</a>
 <a href="#466" id="466">466</a>
 <a href="#467" id="467">467</a>
+<a href="#468" id="468">468</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -830,6 +831,7 @@
                         IncomingAdvancedFileConfig {
                             mode: <span class="prelude-val">Some</span>(IncomingMode::Mirror),
                             http_header_filter: <span class="prelude-val">None</span>,
+                            port_mapping: <span class="prelude-val">None</span>,
                         },
                     ))),
                     outgoing: <span class="prelude-val">Some</span>(ToggleableConfig::Config(OutgoingFileConfig {
@@ -914,12 +916,12 @@
     }
 
     <span class="attr">#[test]
-    </span><span class="kw">fn </span>test_schema_file_exists() {
+    </span><span class="kw">fn </span>schema_file_exists() {
         <span class="kw">let _ </span>= File::open(SCHEMA_FILE_PATH).expect(<span class="string">&quot;Schema file doesn&#39;t exist!&quot;</span>);
     }
 
     <span class="attr">#[test]
-    </span><span class="kw">fn </span>test_schema_file_is_up_to_date() {
+    </span><span class="kw">fn </span>schema_file_is_up_to_date() {
         <span class="kw">let </span>compare_schema = <span class="macro">schemars::schema_for!</span>(LayerFileConfig);
         <span class="kw">let </span>compare_content =
             serde_json::to_string_pretty(<span class="kw-2">&amp;</span>compare_schema).expect(<span class="string">&quot;Failed generating schema!&quot;</span>);
