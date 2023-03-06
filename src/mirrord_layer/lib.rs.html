@@ -868,6 +868,28 @@
 <a href="#868" id="868">868</a>
 <a href="#869" id="869">869</a>
 <a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -1059,19 +1081,33 @@
 /// 2. [`go_hooks`] file operations.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>FILE_MODE: OnceLock&lt;FsConfig&gt; = OnceLock::new();
 
-<span class="doccomment">/// Tells us if the user enabled the Tcp outgoing feature in [`NetworkConfig`].
+<span class="doccomment">/// Tells us if the user enabled the Tcp outgoing feature in [`OutgoingConfig`].
 ///
 /// ## Usage
 ///
 /// Used to change the behavior of the `socket::ops::connect` hook operation.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>ENABLED_TCP_OUTGOING: OnceLock&lt;bool&gt; = OnceLock::new();
 
-<span class="doccomment">/// Tells us if the user enabled the Udp outgoing feature in [`NetworkConfig`].
+<span class="doccomment">/// Tells us if the user enabled the Udp outgoing feature in [`OutgoingConfig`].
 ///
 /// ## Usage
 ///
 /// Used to change the behavior of the `socket::ops::connect` hook operation.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>ENABLED_UDP_OUTGOING: OnceLock&lt;bool&gt; = OnceLock::new();
+
+<span class="doccomment">/// Tells us if the user enabled wants to ignore localhots connections in [`OutgoingConfig`].
+///
+/// ## Usage
+///
+/// When true, localhost connections will stay local (won&#39;t go to the remote pod localhost)
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>OUTGOING_IGNORE_LOCALHOST: OnceLock&lt;bool&gt; = OnceLock::new();
+
+<span class="doccomment">/// Tells us if the user enabled wants to ignore listening on localhost in [`IncomingConfig`].
+///
+/// ## Usage
+///
+/// When true, localhost connections will stay local - wont mirror or steal.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>INCOMING_IGNORE_LOCALHOST: OnceLock&lt;bool&gt; = OnceLock::new();
 
 <span class="doccomment">/// Check if we&#39;re running in NixOS or Devbox.
 ///
@@ -1256,6 +1292,14 @@
     ENABLED_UDP_OUTGOING
         .set(config.feature.network.outgoing.udp)
         .expect(<span class="string">&quot;Setting ENABLED_UDP_OUTGOING singleton&quot;</span>);
+
+    OUTGOING_IGNORE_LOCALHOST
+        .set(config.feature.network.outgoing.ignore_localhost)
+        .expect(<span class="string">&quot;Setting OUTGOING_IGNORE_LOCALHOST singleton&quot;</span>);
+
+    INCOMING_IGNORE_LOCALHOST
+        .set(config.feature.network.incoming.ignore_localhost)
+        .expect(<span class="string">&quot;Setting INCOMING_IGNORE_LOCALHOST singleton&quot;</span>);
 
     FILE_FILTER.get_or_init(|| FileFilter::new(config.feature.fs.clone()));
 

@@ -198,6 +198,17 @@
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 
 <span class="kw">use </span>bimap::BiMap;
@@ -207,8 +218,8 @@
 
 <span class="kw">use crate</span>::{
     config::{
-        from_env::FromEnv, source::MirrordConfigSource, ConfigError, FromMirrordConfig,
-        MirrordConfig, <span class="prelude-ty">Result</span>,
+        from_env::FromEnv, source::MirrordConfigSource, unstable::Unstable, ConfigError,
+        FromMirrordConfig, MirrordConfig, <span class="prelude-ty">Result</span>,
     },
     util::{MirrordToggleableConfig, ToggleableConfig},
 };
@@ -298,6 +309,12 @@
                     .port_mapping
                     .map(|m| m.into_iter().collect())
                     .unwrap_or_default(),
+                ignore_localhost: advanced
+                    .ignore_localhost
+                    .layer(|layer| Unstable::new(<span class="string">&quot;IncomingFileConfig&quot;</span>, <span class="string">&quot;ignore_localhost&quot;</span>, layer))
+                    .source_value()
+                    .transpose()<span class="question-mark">?
+                    </span>.unwrap_or_default(),
             },
         };
 
@@ -337,6 +354,9 @@
     /// machine. For example, your local process listens on port 9333 and the container listens
     /// on port 80. You&#39;d use [[9333, 80]]
     </span><span class="kw">pub </span>port_mapping: <span class="prelude-ty">Option</span>&lt;Vec&lt;(u16, u16)&gt;&gt;,
+
+    <span class="doccomment">/// Consider removing when adding https://github.com/metalbear-co/mirrord/issues/702
+    </span><span class="kw">pub </span>ignore_localhost: <span class="prelude-ty">Option</span>&lt;bool&gt;,
 }
 
 <span class="attr">#[derive(Default, PartialEq, Eq, Clone, Debug)]
@@ -346,6 +366,8 @@
     <span class="kw">pub </span>http_header_filter: http_filter::HttpHeaderFilterConfig,
 
     <span class="kw">pub </span>port_mapping: BiMap&lt;u16, u16&gt;,
+
+    <span class="kw">pub </span>ignore_localhost: bool,
 }
 
 <span class="kw">impl </span>IncomingConfig {

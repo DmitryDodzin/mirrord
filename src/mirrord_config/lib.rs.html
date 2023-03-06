@@ -474,6 +474,8 @@
 <a href="#474" id="474">474</a>
 <a href="#475" id="475">475</a>
 <a href="#476" id="476">476</a>
+<a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -847,11 +849,13 @@
                             mode: <span class="prelude-val">Some</span>(IncomingMode::Mirror),
                             http_header_filter: <span class="prelude-val">None</span>,
                             port_mapping: <span class="prelude-val">None</span>,
+                            ignore_localhost: <span class="prelude-val">None</span>,
                         },
                     ))),
                     outgoing: <span class="prelude-val">Some</span>(ToggleableConfig::Config(OutgoingFileConfig {
                         tcp: <span class="prelude-val">Some</span>(<span class="bool-val">true</span>),
                         udp: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
+                        ..Default::default()
                     })),
                 })),
                 capture_error_trace: <span class="prelude-val">None</span>,
