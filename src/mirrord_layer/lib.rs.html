@@ -853,6 +853,21 @@
 <a href="#853" id="853">853</a>
 <a href="#854" id="854">854</a>
 <a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
+<a href="#861" id="861">861</a>
+<a href="#862" id="862">862</a>
+<a href="#863" id="863">863</a>
+<a href="#864" id="864">864</a>
+<a href="#865" id="865">865</a>
+<a href="#866" id="866">866</a>
+<a href="#867" id="867">867</a>
+<a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -1125,10 +1140,17 @@
 
     nix_devbox_patch(<span class="kw-2">&amp;mut </span>config);
 
+    <span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
+    </span><span class="kw">let </span>patch_binaries = config
+        .sip_binaries
+        .clone()
+        .map(|x| x.to_vec())
+        .unwrap_or_default();
+
     <span class="kw">match </span>load::load_type(given_process, config) {
         LoadType::Full(config) =&gt; layer_start(<span class="kw-2">*</span>config),
         <span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
-        </span>LoadType::SIPOnly =&gt; sip_only_layer_start(),
+        </span>LoadType::SIPOnly =&gt; sip_only_layer_start(patch_binaries),
         LoadType::Skip =&gt; {}
     }
 
@@ -1237,7 +1259,15 @@
 
     FILE_FILTER.get_or_init(|| FileFilter::new(config.feature.fs.clone()));
 
-    enable_hooks(file_mode.is_active(), config.feature.network.dns);
+    enable_hooks(
+        file_mode.is_active(),
+        config.feature.network.dns,
+        config
+            .sip_binaries
+            .clone()
+            .map(|x| x.to_vec())
+            .unwrap_or_default(),
+    );
 
     RUNTIME.block_on(start_layer_thread(tx, rx, receiver, config));
 }
@@ -1245,10 +1275,10 @@
 <span class="doccomment">/// We need to hook execve syscall to allow mirrord-layer to be loaded with sip patch when loading
 /// mirrord-layer on a process where specified to skip with MIRRORD_SKIP_PROCESSES
 </span><span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
-</span><span class="kw">fn </span>sip_only_layer_start() {
+</span><span class="kw">fn </span>sip_only_layer_start(patch_binaries: Vec&lt;String&gt;) {
     <span class="kw">let </span><span class="kw-2">mut </span>hook_manager = HookManager::default();
 
-    <span class="kw">unsafe </span>{ exec::enable_execve_hook(<span class="kw-2">&amp;mut </span>hook_manager) };
+    <span class="kw">unsafe </span>{ exec::enable_execve_hook(<span class="kw-2">&amp;mut </span>hook_manager, patch_binaries) };
 }
 
 <span class="doccomment">/// Acts as an API to the various features of mirrord-layer, holding the actual feature handler
@@ -1604,7 +1634,7 @@
 ///   `true`, see [`NetworkConfig`], and
 ///   [`hooks::enable_socket_hooks`](socket::hooks::enable_socket_hooks).
 </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
-</span><span class="kw">fn </span>enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool) {
+</span><span class="kw">fn </span>enable_hooks(enabled_file_ops: bool, enabled_remote_dns: bool, patch_binaries: Vec&lt;String&gt;) {
     <span class="kw">let </span><span class="kw-2">mut </span>hook_manager = HookManager::default();
 
     <span class="kw">unsafe </span>{
@@ -1631,7 +1661,7 @@
 
     <span class="attr">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
     </span><span class="kw">unsafe </span>{
-        exec::enable_execve_hook(<span class="kw-2">&amp;mut </span>hook_manager)
+        exec::enable_execve_hook(<span class="kw-2">&amp;mut </span>hook_manager, patch_binaries)
     };
 
     <span class="kw">if </span>enabled_file_ops {

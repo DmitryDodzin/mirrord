@@ -667,6 +667,10 @@
 <a href="#667" id="667">667</a>
 <a href="#668" id="668">668</a>
 <a href="#669" id="669">669</a>
+<a href="#670" id="670">670</a>
+<a href="#671" id="671">671</a>
+<a href="#672" id="672">672</a>
+<a href="#673" id="673">673</a>
 </pre><pre class="rust"><code><span class="kw">use </span>alloc::ffi::CString;
 <span class="kw">use </span>core::{ffi::CStr, mem};
 <span class="kw">use </span>std::{
@@ -753,6 +757,10 @@
     } <span class="kw">else </span>{
         <span class="prelude-val">Ok</span>(())
     }<span class="question-mark">?</span>;
+
+    <span class="kw">if </span>domain == libc::AF_INET6 {
+        <span class="kw">return </span>Detour::Error(HookError::SocketUnsuportedIpv6);
+    }
 
     <span class="kw">let </span>socket_result = <span class="kw">unsafe </span>{ FN_SOCKET(domain, type_, protocol) };
 

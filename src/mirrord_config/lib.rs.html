@@ -466,6 +466,14 @@
 <a href="#466" id="466">466</a>
 <a href="#467" id="467">467</a>
 <a href="#468" id="468">468</a>
+<a href="#469" id="469">469</a>
+<a href="#470" id="470">470</a>
+<a href="#471" id="471">471</a>
+<a href="#472" id="472">472</a>
+<a href="#473" id="473">473</a>
+<a href="#474" id="474">474</a>
+<a href="#475" id="475">475</a>
+<a href="#476" id="476">476</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -594,6 +602,13 @@
     /// in-cluster config.
     </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_KUBECONFIG&quot;</span>)]
     </span><span class="kw">pub </span>kubeconfig: <span class="prelude-ty">Option</span>&lt;String&gt;,
+
+    <span class="doccomment">/// Binaries to patch (macOS SIP).
+    /// Use this when mirrord isn&#39;t loaded to protected binaries
+    /// that weren&#39;t automatically patched.
+    /// Runs `endswith` on the binary path (so `bash` would apply to any binary
+    /// ending with `bash` while `/usr/bin/bash` would apply only for that binary).
+    </span><span class="kw">pub </span>sip_binaries: <span class="prelude-ty">Option</span>&lt;VecOrSingle&lt;String&gt;&gt;,
 }
 
 <span class="kw">impl </span>LayerConfig {
@@ -843,6 +858,7 @@
             }),
             connect_tcp: <span class="prelude-val">None</span>,
             operator: <span class="prelude-val">None</span>,
+            sip_binaries: <span class="prelude-val">None</span>,
         };
 
         <span class="macro">assert_eq!</span>(config, expect);
