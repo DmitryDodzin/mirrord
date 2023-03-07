@@ -890,6 +890,8 @@
 <a href="#890" id="890">890</a>
 <a href="#891" id="891">891</a>
 <a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(c_variadic)]
 #![feature(once_cell)]
 #![feature(result_option_inspect)]
@@ -1007,6 +1009,7 @@
     common::HookMessage,
     file::{filter::FILE_FILTER, FileHandler},
     load::LoadType,
+    socket::CONNECTION_QUEUE,
 };
 
 <span class="kw">mod </span>common;
@@ -1733,10 +1736,11 @@
         .expect(<span class="string">&quot;Should be set during initialization!&quot;</span>)
         .is_active();
 
-    <span class="comment">// Remove from sockets, or if not a socket, remove from files if file mode active
-    </span><span class="kw">if </span>SOCKETS.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd).is_none() &amp;&amp; file_mode_active {
-        <span class="comment">// SOCKETS lock dropped, not holding it while locking OPEN_FILES.
-        </span>OPEN_FILES.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd);
+    <span class="comment">// Remove from sockets, also removing the `ConnectionQueue` associated with the socket.
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(socket) = SOCKETS.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd) {
+        CONNECTION_QUEUE.lock().unwrap().remove(socket.id);
+    } <span class="kw">else if </span>file_mode_active {
+        OPEN_FILES.lock().unwrap().remove(<span class="kw-2">&amp;</span>fd);
     }
 }
 

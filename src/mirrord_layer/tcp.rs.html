@@ -189,7 +189,6 @@
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
 <a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
 </pre><pre class="rust"><code><span class="doccomment">/// Tcp Traffic management, common code for stealing &amp; mirroring
 </span><span class="kw">use </span>std::{
     borrow::Borrow,
@@ -197,7 +196,6 @@
     hash::{Hash, Hasher},
     net::SocketAddr,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    os::unix::io::RawFd,
 };
 
 <span class="kw">use </span>async_trait::async_trait;
@@ -212,7 +210,7 @@
 <span class="kw">use crate</span>::{
     detour::DetourGuard,
     error::LayerError,
-    socket::{SocketInformation, CONNECTION_QUEUE},
+    socket::{id::SocketId, SocketInformation, CONNECTION_QUEUE},
     LayerError::{PortAlreadyStolen, UnexpectedResponseError},
 };
 
@@ -226,7 +224,7 @@
     <span class="kw">pub </span>mirror_port: Port,
     <span class="kw">pub </span>requested_port: Port,
     <span class="kw">pub </span>ipv6: bool,
-    <span class="kw">pub </span>fd: RawFd,
+    <span class="kw">pub </span>id: SocketId,
 }
 
 <span class="kw">impl </span>PartialEq <span class="kw">for </span>Listen {
@@ -354,7 +352,7 @@
         );
 
         {
-            CONNECTION_QUEUE.lock().unwrap().add(<span class="kw-2">&amp;</span>listen.fd, info);
+            CONNECTION_QUEUE.lock().unwrap().add(listen.id, info);
         }
 
         <span class="attr">#[allow(clippy::let_and_return)]

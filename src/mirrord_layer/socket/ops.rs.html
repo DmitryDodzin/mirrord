@@ -681,15 +681,6 @@
 <a href="#681" id="681">681</a>
 <a href="#682" id="682">682</a>
 <a href="#683" id="683">683</a>
-<a href="#684" id="684">684</a>
-<a href="#685" id="685">685</a>
-<a href="#686" id="686">686</a>
-<a href="#687" id="687">687</a>
-<a href="#688" id="688">688</a>
-<a href="#689" id="689">689</a>
-<a href="#690" id="690">690</a>
-<a href="#691" id="691">691</a>
-<a href="#692" id="692">692</a>
 </pre><pre class="rust"><code><span class="kw">use </span>alloc::ffi::CString;
 <span class="kw">use </span>core::{ffi::CStr, mem};
 <span class="kw">use </span>std::{
@@ -790,13 +781,7 @@
         <span class="prelude-val">Ok</span>(socket_result)
     }<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>new_socket = UserSocket {
-        domain,
-        type_,
-        protocol,
-        state: SocketState::default(),
-        kind: socket_kind,
-    };
+    <span class="kw">let </span>new_socket = UserSocket::new(domain, type_, protocol, Default::default(), socket_kind);
 
     SOCKETS.lock()<span class="question-mark">?</span>.insert(socket_fd, Arc::new(new_socket));
 
@@ -819,14 +804,6 @@
         .copied()
         .expect(<span class="string">&quot;Should be set during initialization!&quot;</span>);
 
-    <span class="kw">if </span>ignore_localhost &amp;&amp; requested_address.ip().is_loopback() {
-        <span class="kw">return </span>Detour::Bypass(Bypass::IgnoreLocalhost(requested_port));
-    }
-
-    <span class="kw">if </span>is_ignored_port(requested_address) || port_debug_patch(requested_address) {
-        <span class="prelude-val">Err</span>(Bypass::Port(requested_address.port()))<span class="question-mark">?</span>;
-    }
-
     <span class="kw">let </span><span class="kw-2">mut </span>socket = {
         SOCKETS
             .lock()<span class="question-mark">?
@@ -840,6 +817,14 @@
                 }
             })<span class="question-mark">?
     </span>};
+
+    <span class="kw">if </span>ignore_localhost &amp;&amp; requested_address.ip().is_loopback() {
+        <span class="kw">return </span>Detour::Bypass(Bypass::IgnoreLocalhost(requested_port));
+    }
+
+    <span class="kw">if </span>is_ignored_port(requested_address) || port_debug_patch(requested_address) {
+        <span class="prelude-val">Err</span>(Bypass::Port(requested_address.port()))<span class="question-mark">?</span>;
+    }
 
     <span class="kw">let </span>unbound_address = <span class="kw">match </span>socket.domain {
         libc::AF_INET =&gt; <span class="prelude-val">Ok</span>(SockAddr::from(SocketAddr::new(
@@ -920,7 +905,7 @@
                 mirror_port: address.port(),
                 requested_port,
                 ipv6: address.is_ipv6(),
-                fd: sockfd,
+                id: socket.id,
             })))<span class="question-mark">?</span>;
 
             Arc::get_mut(<span class="kw-2">&amp;mut </span>socket).unwrap().state = SocketState::Listening(Bound {
@@ -1168,8 +1153,9 @@
 }
 
 <span class="doccomment">/// When the fd is &quot;ours&quot;, we accept and recv the first bytes that contain metadata on the
-/// connection to be set in our lock This enables us to have a safe way to get &quot;remote&quot; information
-/// (remote ip, port, etc).
+/// connection to be set in our lock.
+///
+/// This enables us to have a safe way to get &quot;remote&quot; information (remote ip, port, etc).
 </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>, skip(address, address_len))]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>accept(
     sockfd: RawFd,
@@ -1177,14 +1163,14 @@
     address_len: <span class="kw-2">*mut </span>socklen_t,
     new_fd: RawFd,
 ) -&gt; Detour&lt;RawFd&gt; {
-    <span class="kw">let </span>(domain, protocol, type_) = {
+    <span class="kw">let </span>(id, domain, protocol, type_) = {
         SOCKETS
             .lock()<span class="question-mark">?
             </span>.get(<span class="kw-2">&amp;</span>sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .and_then(|socket| <span class="kw">match </span><span class="kw-2">&amp;</span>socket.state {
                 SocketState::Listening(<span class="kw">_</span>) =&gt; {
-                    Detour::Success((socket.domain, socket.protocol, socket.type_))
+                    Detour::Success((socket.id, socket.domain, socket.protocol, socket.type_))
                 }
                 <span class="kw">_ </span>=&gt; Detour::Bypass(Bypass::InvalidState(sockfd)),
             })<span class="question-mark">?
@@ -1193,21 +1179,17 @@
     <span class="kw">let </span>(local_address, remote_address) = {
         CONNECTION_QUEUE
             .lock()<span class="question-mark">?
-            </span>.get(<span class="kw-2">&amp;</span>sockfd)
+            </span>.pop_front(id)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .map(|socket| (socket.local_address, socket.remote_address))<span class="question-mark">?
     </span>};
 
-    <span class="kw">let </span>new_socket = UserSocket {
-        domain,
-        protocol,
-        type_,
-        state: SocketState::Connected(Connected {
-            remote_address,
-            local_address,
-        }),
-        kind: type_.try_into()<span class="question-mark">?</span>,
-    };
+    <span class="kw">let </span>state = SocketState::Connected(Connected {
+        remote_address,
+        local_address,
+    });
+    <span class="kw">let </span>new_socket = UserSocket::new(domain, type_, protocol, state, type_.try_into()<span class="question-mark">?</span>);
+
     fill_address(address, address_len, remote_address)<span class="question-mark">?</span>;
 
     SOCKETS.lock()<span class="question-mark">?</span>.insert(new_fd, Arc::new(new_socket));
