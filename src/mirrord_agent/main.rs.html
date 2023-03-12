@@ -661,6 +661,21 @@
 <a href="#661" id="661">661</a>
 <a href="#662" id="662">662</a>
 <a href="#663" id="663">663</a>
+<a href="#664" id="664">664</a>
+<a href="#665" id="665">665</a>
+<a href="#666" id="666">666</a>
+<a href="#667" id="667">667</a>
+<a href="#668" id="668">668</a>
+<a href="#669" id="669">669</a>
+<a href="#670" id="670">670</a>
+<a href="#671" id="671">671</a>
+<a href="#672" id="672">672</a>
+<a href="#673" id="673">673</a>
+<a href="#674" id="674">674</a>
+<a href="#675" id="675">675</a>
+<a href="#676" id="676">676</a>
+<a href="#677" id="677">677</a>
+<a href="#678" id="678">678</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(result_option_inspect)]
 #![feature(hash_drain_filter)]
 #![feature(once_cell)]
@@ -671,6 +686,7 @@
 </span><span class="kw">use </span>std::{
     collections::{HashMap, HashSet},
     net::{Ipv4Addr, SocketAddrV4},
+    path::PathBuf,
 };
 
 <span class="kw">use </span>actix_codec::Framed;
@@ -1107,10 +1123,24 @@
     .<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>state = State::new(<span class="kw-2">&amp;</span>args).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let </span>(pid, env) = <span class="kw">match </span>state.get_container_info().<span class="kw">await</span><span class="question-mark">? </span>{
+    <span class="kw">let </span>(pid, <span class="kw-2">mut </span>env) = <span class="kw">match </span>state.get_container_info().<span class="kw">await</span><span class="question-mark">? </span>{
         <span class="prelude-val">Some</span>(ContainerInfo { pid, env }) =&gt; (<span class="prelude-val">Some</span>(pid), env),
         <span class="prelude-val">None </span>=&gt; (<span class="prelude-val">None</span>, HashMap::new()),
     };
+
+    <span class="kw">let </span>environ_path = PathBuf::from(<span class="string">&quot;/proc&quot;</span>)
+        .join(
+            pid.map(|i| i.to_string())
+                .unwrap_or_else(|| <span class="string">&quot;self&quot;</span>.to_string()),
+        )
+        .join(<span class="string">&quot;environ&quot;</span>);
+
+    <span class="kw">match </span>env::get_proc_environ(environ_path).<span class="kw">await </span>{
+        <span class="prelude-val">Ok</span>(environ) =&gt; env.extend(environ.into_iter()),
+        <span class="prelude-val">Err</span>(err) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to get process environment variables: {err:?}&quot;</span>);
+        }
+    }
 
     <span class="kw">let </span>cancellation_token = CancellationToken::new();
     <span class="comment">// Cancel all other tasks on exit
