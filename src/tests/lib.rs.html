@@ -932,7 +932,7 @@
     <span class="kw">use </span>rstest::<span class="kw-2">*</span>;
     <span class="kw">use </span>serde::{de::DeserializeOwned, Serialize};
     <span class="kw">use </span>serde_json::json;
-    <span class="kw">use </span>tempdir::TempDir;
+    <span class="kw">use </span>tempfile::{tempdir, TempDir};
     <span class="kw">use </span>tokio::{
         io::{AsyncReadExt, BufReader},
         process::{Child, Command},
@@ -1217,7 +1217,7 @@
             <span class="prelude-val">None </span>=&gt; <span class="macro">env!</span>(<span class="string">&quot;CARGO_BIN_FILE_MIRRORD&quot;</span>),
             <span class="prelude-val">Some</span>(binary_path) =&gt; binary_path,
         };
-        <span class="kw">let </span>temp_dir = tempdir::TempDir::new(<span class="string">&quot;test&quot;</span>).unwrap();
+        <span class="kw">let </span>temp_dir = tempdir().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>mirrord_args = <span class="macro">vec!</span>[<span class="string">&quot;exec&quot;</span>, <span class="string">&quot;--target&quot;</span>, target, <span class="string">&quot;-c&quot;</span>];
         <span class="kw">if let </span><span class="prelude-val">Some</span>(namespace) = namespace {
             mirrord_args.extend([<span class="string">&quot;--target-namespace&quot;</span>, namespace].into_iter());
@@ -1267,7 +1267,7 @@
             <span class="prelude-val">None </span>=&gt; <span class="macro">env!</span>(<span class="string">&quot;CARGO_BIN_FILE_MIRRORD&quot;</span>),
             <span class="prelude-val">Some</span>(binary_path) =&gt; binary_path,
         };
-        <span class="kw">let </span>temp_dir = tempdir::TempDir::new(<span class="string">&quot;test&quot;</span>).unwrap();
+        <span class="kw">let </span>temp_dir = tempdir().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>mirrord_args = <span class="macro">vec!</span>[<span class="string">&quot;ls&quot;</span>];
         <span class="kw">if let </span><span class="prelude-val">Some</span>(args) = args {
             mirrord_args.extend(args);
