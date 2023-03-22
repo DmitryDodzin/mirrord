@@ -1,0 +1,25 @@
+namespace mirrord_protocol;
+
+struct IpAddr {
+    value:[ubyte:4];
+}
+
+table NewTcpConnection {
+    connection_id:ulong;
+    remote_address:IpAddr;
+    source_port:ushort;
+    local_address:IpAddr;
+}
+
+table TcpData {
+    connection_id:ulong;
+    bytes:[ubyte];
+}
+
+union DaemonTcpMessage { NewTcpConnection, TcpData }
+
+table DaemonTcp {
+    inner:DaemonTcpMessage;
+}
+
+root_type DaemonTcp;
