@@ -372,6 +372,10 @@
 <a href="#372" id="372">372</a>
 <a href="#373" id="373">373</a>
 <a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
 </pre><pre class="rust"><code><span class="kw">mod </span>steal;
 
 <span class="attr">#[cfg(test)]
@@ -637,6 +641,7 @@
 
     <span class="attr">#[rstest]
     #[tokio::test(flavor = <span class="string">&quot;multi_thread&quot;</span>, worker_threads = <span class="number">2</span>)]
+    #[timeout(Duration::from_secs(<span class="number">60</span>))]
     </span><span class="kw">pub async fn </span>go20_outgoing_traffic_single_request_enabled(<span class="attr">#[future] </span>service: KubeService) {
         <span class="kw">let </span>command = <span class="macro">vec!</span>[<span class="string">&quot;go-e2e-outgoing/20&quot;</span>];
         test_go(service, command).<span class="kw">await</span>;
@@ -644,6 +649,7 @@
 
     <span class="attr">#[rstest]
     #[tokio::test(flavor = <span class="string">&quot;multi_thread&quot;</span>, worker_threads = <span class="number">2</span>)]
+    #[timeout(Duration::from_secs(<span class="number">60</span>))]
     </span><span class="kw">pub async fn </span>go18_dns_lookup(<span class="attr">#[future] </span>service: KubeService) {
         <span class="kw">let </span>command = <span class="macro">vec!</span>[<span class="string">&quot;go-e2e-dns/18&quot;</span>];
         test_go(service, command).<span class="kw">await</span>;
@@ -651,6 +657,7 @@
 
     <span class="attr">#[rstest]
     #[tokio::test(flavor = <span class="string">&quot;multi_thread&quot;</span>, worker_threads = <span class="number">2</span>)]
+    #[timeout(Duration::from_secs(<span class="number">60</span>))]
     </span><span class="kw">pub async fn </span>go19_dns_lookup(<span class="attr">#[future] </span>service: KubeService) {
         <span class="kw">let </span>command = <span class="macro">vec!</span>[<span class="string">&quot;go-e2e-dns/19&quot;</span>];
         test_go(service, command).<span class="kw">await</span>;
@@ -658,6 +665,7 @@
 
     <span class="attr">#[rstest]
     #[tokio::test(flavor = <span class="string">&quot;multi_thread&quot;</span>, worker_threads = <span class="number">2</span>)]
+    #[timeout(Duration::from_secs(<span class="number">60</span>))]
     </span><span class="kw">pub async fn </span>go20_dns_lookup(<span class="attr">#[future] </span>service: KubeService) {
         <span class="kw">let </span>command = <span class="macro">vec!</span>[<span class="string">&quot;go-e2e-dns/20&quot;</span>];
         test_go(service, command).<span class="kw">await</span>;
