@@ -7,6 +7,7 @@ pub mod dns;
 pub mod error;
 pub mod file;
 pub mod outgoing;
+pub mod proto;
 pub mod tcp;
 
 use std::{collections::HashSet, ops::Deref};
