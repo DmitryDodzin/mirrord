@@ -719,12 +719,14 @@
 <a href="#719" id="719">719</a>
 <a href="#720" id="720">720</a>
 <a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
 </pre><pre class="rust"><code><span class="kw">use </span>alloc::ffi::CString;
 <span class="kw">use </span>core::{ffi::CStr, mem};
 <span class="kw">use </span>std::{
     io,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     os::unix::io::RawFd,
+    path::PathBuf,
     ptr,
     sync::{Arc, OnceLock},
 };
@@ -1411,10 +1413,10 @@
 
 <span class="doccomment">/// Retrieves the `hostname` from the agent&#39;s `/etc/hostname` to be used by [`gethostname`]
 </span><span class="kw">fn </span>remote_hostname_string() -&gt; Detour&lt;CString&gt; {
-    <span class="kw">let </span>hostname_path = CString::new(<span class="string">&quot;/etc/hostname&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>hostname_path = PathBuf::from(<span class="string">&quot;/etc/hostname&quot;</span>);
 
     <span class="kw">let </span>hostname_fd = file::ops::open(
-        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>hostname_path),
+        Detour::Success(hostname_path),
         OpenOptionsInternal {
             read: <span class="bool-val">true</span>,
             ..Default::default()
