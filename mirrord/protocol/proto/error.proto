@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package protocol.error;
+
+enum ErrorKind {
+	NotFound = 0;
+    PermissionDenied = 1;
+    ConnectionRefused = 2;
+    ConnectionReset = 3;
+    HostUnreachable = 4;
+    NetworkUnreachable = 5;
+    ConnectionAborted = 6;
+    NotConnected = 7;
+    AddrInUse = 8;
+    AddrNotAvailable = 9;
+    NetworkDown = 10;
+    BrokenPipe = 11;
+    AlreadyExists = 12;
+    WouldBlock = 13;
+    NotADirectory = 14;
+    IsADirectory = 16;
+    DirectoryNotEmpty = 17;
+    ReadOnlyFilesystem = 18;
+    FilesystemLoop = 19;
+    StaleNetworkFileHandle = 20;
+    InvalidInput = 21;
+    InvalidData = 22;
+    TimedOut = 23;
+    WriteZero = 24;
+    StorageFull = 25;
+    NotSeekable = 26;
+    FilesystemQuotaExceeded = 27;
+    FileTooLarge = 28;
+    ResourceBusy = 29;
+    ExecutableFileBusy = 30;
+    Deadlock = 31;
+    CrossesDevices = 32;
+    TooManyLinks = 33;
+    InvalidFilename = 34;
+    ArgumentListTooLong = 35;
+    Interrupted = 36;
+    Unsupported = 37;
+    UnexpectedEof = 38;
+    OutOfMemory = 39;
+    Other = 40;
+    Unknown = 41;
+}
+
+message ErrorKindInternal {
+	ErrorKind kind = 1;
+	optional string unknown_value = 2;
+}
+
+message ResponseError {
+	oneof responseErrorType {
+		string allocation_failure = 1;
+		uint64 not_found = 2;
+		uint64 not_directory = 3;
+		uint64 not_file = 4;
+		RemoteIOError remote_io = 5;
+		DnsLookupError dns_lookup = 6;
+		RemoteError remote_error = 7;
+		int32 port_already_stolen = 8;
+		bool not_implemented = 9;
+	}
+}
+
+message RemoteIOError {
+	optional int32 raw_os_error = 1;
+	ErrorKindInternal kind = 2;
+}
+
+message DnsLookupError {
+	ErrorKindInternal kind = 1;
+}
+
+message BadHttpFilterRegexError {
+	string filter = 1;
+	string message = 2;
+}
+
+message RemoteError {
+	oneof remoteErrorType {
+		bool nameserver_not_found = 1;
+		string address_parsing = 2;
+		bytes InvalidAddress = 3;
+		bytes connect_timed_out = 4;
+		BadHttpFilterRegexError bad_http_filter_regex = 5;
+	}
+}

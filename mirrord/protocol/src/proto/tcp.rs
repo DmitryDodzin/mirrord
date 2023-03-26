@@ -19,28 +19,28 @@
 #![allow(unused_results)]
 #![allow(unused_mut)]
 
-//! Generated file from `proto/tcp.proto`
+//! Generated file from `tcp.proto`
 
 /// Generated files are compatible only with the same version
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_3_2_0;
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:protocol.NewTcpConnection)
+// @@protoc_insertion_point(message:protocol.tcp.NewTcpConnection)
 pub struct NewTcpConnection {
     // message fields
-    // @@protoc_insertion_point(field:protocol.NewTcpConnection.connection_id)
+    // @@protoc_insertion_point(field:protocol.tcp.NewTcpConnection.connection_id)
     pub connection_id: u64,
-    // @@protoc_insertion_point(field:protocol.NewTcpConnection.remote_address)
+    // @@protoc_insertion_point(field:protocol.tcp.NewTcpConnection.remote_address)
     pub remote_address: ::std::vec::Vec<u8>,
-    // @@protoc_insertion_point(field:protocol.NewTcpConnection.destination_port)
+    // @@protoc_insertion_point(field:protocol.tcp.NewTcpConnection.destination_port)
     pub destination_port: i32,
-    // @@protoc_insertion_point(field:protocol.NewTcpConnection.source_port)
+    // @@protoc_insertion_point(field:protocol.tcp.NewTcpConnection.source_port)
     pub source_port: i32,
-    // @@protoc_insertion_point(field:protocol.NewTcpConnection.local_address)
+    // @@protoc_insertion_point(field:protocol.tcp.NewTcpConnection.local_address)
     pub local_address: ::std::vec::Vec<u8>,
     // special fields
-    // @@protoc_insertion_point(special_field:protocol.NewTcpConnection.special_fields)
+    // @@protoc_insertion_point(special_field:protocol.tcp.NewTcpConnection.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -220,15 +220,15 @@ impl ::protobuf::reflect::ProtobufValue for NewTcpConnection {
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:protocol.TcpData)
+// @@protoc_insertion_point(message:protocol.tcp.TcpData)
 pub struct TcpData {
     // message fields
-    // @@protoc_insertion_point(field:protocol.TcpData.connection_id)
+    // @@protoc_insertion_point(field:protocol.tcp.TcpData.connection_id)
     pub connection_id: u64,
-    // @@protoc_insertion_point(field:protocol.TcpData.bytes)
+    // @@protoc_insertion_point(field:protocol.tcp.TcpData.bytes)
     pub bytes: ::std::vec::Vec<u8>,
     // special fields
-    // @@protoc_insertion_point(special_field:protocol.TcpData.special_fields)
+    // @@protoc_insertion_point(special_field:protocol.tcp.TcpData.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -360,13 +360,13 @@ impl ::protobuf::reflect::ProtobufValue for TcpData {
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:protocol.TcpClose)
+// @@protoc_insertion_point(message:protocol.tcp.TcpClose)
 pub struct TcpClose {
     // message fields
-    // @@protoc_insertion_point(field:protocol.TcpClose.connection_id)
+    // @@protoc_insertion_point(field:protocol.tcp.TcpClose.connection_id)
     pub connection_id: u64,
     // special fields
-    // @@protoc_insertion_point(special_field:protocol.TcpClose.special_fields)
+    // @@protoc_insertion_point(special_field:protocol.tcp.TcpClose.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -482,12 +482,759 @@ impl ::protobuf::reflect::ProtobufValue for TcpClose {
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:protocol.LayerTcp)
+// @@protoc_insertion_point(message:protocol.tcp.SubscribeResult)
+pub struct SubscribeResult {
+    // message oneof groups
+    pub result: ::std::option::Option<subscribe_result::Result>,
+    // special fields
+    // @@protoc_insertion_point(special_field:protocol.tcp.SubscribeResult.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a SubscribeResult {
+    fn default() -> &'a SubscribeResult {
+        <SubscribeResult as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl SubscribeResult {
+    pub fn new() -> SubscribeResult {
+        ::std::default::Default::default()
+    }
+
+    // int32 ok = 1;
+
+    pub fn ok(&self) -> i32 {
+        match self.result {
+            ::std::option::Option::Some(subscribe_result::Result::Ok(v)) => v,
+            _ => 0,
+        }
+    }
+
+    pub fn clear_ok(&mut self) {
+        self.result = ::std::option::Option::None;
+    }
+
+    pub fn has_ok(&self) -> bool {
+        match self.result {
+            ::std::option::Option::Some(subscribe_result::Result::Ok(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_ok(&mut self, v: i32) {
+        self.result = ::std::option::Option::Some(subscribe_result::Result::Ok(v))
+    }
+
+    // .protocol.error.ResponseError err = 2;
+
+    pub fn err(&self) -> &super::error::ResponseError {
+        match self.result {
+            ::std::option::Option::Some(subscribe_result::Result::Err(ref v)) => v,
+            _ => <super::error::ResponseError as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_err(&mut self) {
+        self.result = ::std::option::Option::None;
+    }
+
+    pub fn has_err(&self) -> bool {
+        match self.result {
+            ::std::option::Option::Some(subscribe_result::Result::Err(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_err(&mut self, v: super::error::ResponseError) {
+        self.result = ::std::option::Option::Some(subscribe_result::Result::Err(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_err(&mut self) -> &mut super::error::ResponseError {
+        if let ::std::option::Option::Some(subscribe_result::Result::Err(_)) = self.result {
+        } else {
+            self.result = ::std::option::Option::Some(subscribe_result::Result::Err(super::error::ResponseError::new()));
+        }
+        match self.result {
+            ::std::option::Option::Some(subscribe_result::Result::Err(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_err(&mut self) -> super::error::ResponseError {
+        if self.has_err() {
+            match self.result.take() {
+                ::std::option::Option::Some(subscribe_result::Result::Err(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            super::error::ResponseError::new()
+        }
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut oneofs = ::std::vec::Vec::with_capacity(1);
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_copy_has_get_set_simpler_accessors::<_, _>(
+            "ok",
+            SubscribeResult::has_ok,
+            SubscribeResult::ok,
+            SubscribeResult::set_ok,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, super::error::ResponseError>(
+            "err",
+            SubscribeResult::has_err,
+            SubscribeResult::err,
+            SubscribeResult::mut_err,
+            SubscribeResult::set_err,
+        ));
+        oneofs.push(subscribe_result::Result::generated_oneof_descriptor_data());
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<SubscribeResult>(
+            "SubscribeResult",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for SubscribeResult {
+    const NAME: &'static str = "SubscribeResult";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.result = ::std::option::Option::Some(subscribe_result::Result::Ok(is.read_int32()?));
+                },
+                18 => {
+                    self.result = ::std::option::Option::Some(subscribe_result::Result::Err(is.read_message()?));
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if let ::std::option::Option::Some(ref v) = self.result {
+            match v {
+                &subscribe_result::Result::Ok(v) => {
+                    my_size += ::protobuf::rt::int32_size(1, v);
+                },
+                &subscribe_result::Result::Err(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+            };
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if let ::std::option::Option::Some(ref v) = self.result {
+            match v {
+                &subscribe_result::Result::Ok(v) => {
+                    os.write_int32(1, v)?;
+                },
+                &subscribe_result::Result::Err(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(2, v, os)?;
+                },
+            };
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> SubscribeResult {
+        SubscribeResult::new()
+    }
+
+    fn clear(&mut self) {
+        self.result = ::std::option::Option::None;
+        self.result = ::std::option::Option::None;
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static SubscribeResult {
+        static instance: SubscribeResult = SubscribeResult {
+            result: ::std::option::Option::None,
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for SubscribeResult {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("SubscribeResult").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for SubscribeResult {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for SubscribeResult {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+/// Nested message and enums of message `SubscribeResult`
+pub mod subscribe_result {
+
+    #[derive(Clone,PartialEq,Debug)]
+    #[non_exhaustive]
+    // @@protoc_insertion_point(oneof:protocol.tcp.SubscribeResult.result)
+    pub enum Result {
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.SubscribeResult.ok)
+        Ok(i32),
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.SubscribeResult.err)
+        Err(super::super::error::ResponseError),
+    }
+
+    impl ::protobuf::Oneof for Result {
+    }
+
+    impl ::protobuf::OneofFull for Result {
+        fn descriptor() -> ::protobuf::reflect::OneofDescriptor {
+            static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::OneofDescriptor> = ::protobuf::rt::Lazy::new();
+            descriptor.get(|| <super::SubscribeResult as ::protobuf::MessageFull>::descriptor().oneof_by_name("result").unwrap()).clone()
+        }
+    }
+
+    impl Result {
+        pub(in super) fn generated_oneof_descriptor_data() -> ::protobuf::reflect::GeneratedOneofDescriptorData {
+            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<Result>("result")
+        }
+    }
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:protocol.tcp.Header)
+pub struct Header {
+    // message fields
+    // @@protoc_insertion_point(field:protocol.tcp.Header.name)
+    pub name: ::std::string::String,
+    // @@protoc_insertion_point(field:protocol.tcp.Header.value)
+    pub value: ::std::string::String,
+    // special fields
+    // @@protoc_insertion_point(special_field:protocol.tcp.Header.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a Header {
+    fn default() -> &'a Header {
+        <Header as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl Header {
+    pub fn new() -> Header {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "name",
+            |m: &Header| { &m.name },
+            |m: &mut Header| { &mut m.name },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "value",
+            |m: &Header| { &m.value },
+            |m: &mut Header| { &mut m.value },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<Header>(
+            "Header",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for Header {
+    const NAME: &'static str = "Header";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.name = is.read_string()?;
+                },
+                18 => {
+                    self.value = is.read_string()?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.name);
+        }
+        if !self.value.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.value);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.name.is_empty() {
+            os.write_string(1, &self.name)?;
+        }
+        if !self.value.is_empty() {
+            os.write_string(2, &self.value)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> Header {
+        Header::new()
+    }
+
+    fn clear(&mut self) {
+        self.name.clear();
+        self.value.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static Header {
+        static instance: Header = Header {
+            name: ::std::string::String::new(),
+            value: ::std::string::String::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for Header {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("Header").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for Header {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Header {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:protocol.tcp.InternalHttpResponse)
+pub struct InternalHttpResponse {
+    // message fields
+    // @@protoc_insertion_point(field:protocol.tcp.InternalHttpResponse.status)
+    pub status: i32,
+    // @@protoc_insertion_point(field:protocol.tcp.InternalHttpResponse.version)
+    pub version: ::std::string::String,
+    // @@protoc_insertion_point(field:protocol.tcp.InternalHttpResponse.headers)
+    pub headers: ::std::vec::Vec<Header>,
+    // @@protoc_insertion_point(field:protocol.tcp.InternalHttpResponse.body)
+    pub body: ::std::vec::Vec<u8>,
+    // special fields
+    // @@protoc_insertion_point(special_field:protocol.tcp.InternalHttpResponse.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a InternalHttpResponse {
+    fn default() -> &'a InternalHttpResponse {
+        <InternalHttpResponse as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl InternalHttpResponse {
+    pub fn new() -> InternalHttpResponse {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(4);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "status",
+            |m: &InternalHttpResponse| { &m.status },
+            |m: &mut InternalHttpResponse| { &mut m.status },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "version",
+            |m: &InternalHttpResponse| { &m.version },
+            |m: &mut InternalHttpResponse| { &mut m.version },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "headers",
+            |m: &InternalHttpResponse| { &m.headers },
+            |m: &mut InternalHttpResponse| { &mut m.headers },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "body",
+            |m: &InternalHttpResponse| { &m.body },
+            |m: &mut InternalHttpResponse| { &mut m.body },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<InternalHttpResponse>(
+            "InternalHttpResponse",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for InternalHttpResponse {
+    const NAME: &'static str = "InternalHttpResponse";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.status = is.read_int32()?;
+                },
+                18 => {
+                    self.version = is.read_string()?;
+                },
+                26 => {
+                    self.headers.push(is.read_message()?);
+                },
+                34 => {
+                    self.body = is.read_bytes()?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if self.status != 0 {
+            my_size += ::protobuf::rt::int32_size(1, self.status);
+        }
+        if !self.version.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.version);
+        }
+        for value in &self.headers {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        if !self.body.is_empty() {
+            my_size += ::protobuf::rt::bytes_size(4, &self.body);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if self.status != 0 {
+            os.write_int32(1, self.status)?;
+        }
+        if !self.version.is_empty() {
+            os.write_string(2, &self.version)?;
+        }
+        for v in &self.headers {
+            ::protobuf::rt::write_message_field_with_cached_size(3, v, os)?;
+        };
+        if !self.body.is_empty() {
+            os.write_bytes(4, &self.body)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> InternalHttpResponse {
+        InternalHttpResponse::new()
+    }
+
+    fn clear(&mut self) {
+        self.status = 0;
+        self.version.clear();
+        self.headers.clear();
+        self.body.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static InternalHttpResponse {
+        static instance: InternalHttpResponse = InternalHttpResponse {
+            status: 0,
+            version: ::std::string::String::new(),
+            headers: ::std::vec::Vec::new(),
+            body: ::std::vec::Vec::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for InternalHttpResponse {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("InternalHttpResponse").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for InternalHttpResponse {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for InternalHttpResponse {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:protocol.tcp.HttpRequest)
+pub struct HttpRequest {
+    // message fields
+    // @@protoc_insertion_point(field:protocol.tcp.HttpRequest.connection_id)
+    pub connection_id: u64,
+    // @@protoc_insertion_point(field:protocol.tcp.HttpRequest.request_id)
+    pub request_id: i32,
+    // @@protoc_insertion_point(field:protocol.tcp.HttpRequest.port)
+    pub port: i32,
+    // @@protoc_insertion_point(field:protocol.tcp.HttpRequest.internal_response)
+    pub internal_response: ::protobuf::MessageField<InternalHttpResponse>,
+    // special fields
+    // @@protoc_insertion_point(special_field:protocol.tcp.HttpRequest.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a HttpRequest {
+    fn default() -> &'a HttpRequest {
+        <HttpRequest as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl HttpRequest {
+    pub fn new() -> HttpRequest {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(4);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "connection_id",
+            |m: &HttpRequest| { &m.connection_id },
+            |m: &mut HttpRequest| { &mut m.connection_id },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "request_id",
+            |m: &HttpRequest| { &m.request_id },
+            |m: &mut HttpRequest| { &mut m.request_id },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "port",
+            |m: &HttpRequest| { &m.port },
+            |m: &mut HttpRequest| { &mut m.port },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_message_field_accessor::<_, InternalHttpResponse>(
+            "internal_response",
+            |m: &HttpRequest| { &m.internal_response },
+            |m: &mut HttpRequest| { &mut m.internal_response },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<HttpRequest>(
+            "HttpRequest",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for HttpRequest {
+    const NAME: &'static str = "HttpRequest";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.connection_id = is.read_uint64()?;
+                },
+                16 => {
+                    self.request_id = is.read_int32()?;
+                },
+                24 => {
+                    self.port = is.read_int32()?;
+                },
+                34 => {
+                    ::protobuf::rt::read_singular_message_into_field(is, &mut self.internal_response)?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if self.connection_id != 0 {
+            my_size += ::protobuf::rt::uint64_size(1, self.connection_id);
+        }
+        if self.request_id != 0 {
+            my_size += ::protobuf::rt::int32_size(2, self.request_id);
+        }
+        if self.port != 0 {
+            my_size += ::protobuf::rt::int32_size(3, self.port);
+        }
+        if let Some(v) = self.internal_response.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if self.connection_id != 0 {
+            os.write_uint64(1, self.connection_id)?;
+        }
+        if self.request_id != 0 {
+            os.write_int32(2, self.request_id)?;
+        }
+        if self.port != 0 {
+            os.write_int32(3, self.port)?;
+        }
+        if let Some(v) = self.internal_response.as_ref() {
+            ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> HttpRequest {
+        HttpRequest::new()
+    }
+
+    fn clear(&mut self) {
+        self.connection_id = 0;
+        self.request_id = 0;
+        self.port = 0;
+        self.internal_response.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static HttpRequest {
+        static instance: HttpRequest = HttpRequest {
+            connection_id: 0,
+            request_id: 0,
+            port: 0,
+            internal_response: ::protobuf::MessageField::none(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for HttpRequest {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("HttpRequest").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for HttpRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for HttpRequest {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:protocol.tcp.LayerTcp)
 pub struct LayerTcp {
     // message oneof groups
-    pub inner: ::std::option::Option<layer_tcp::Inner>,
+    pub layerTcpType: ::std::option::Option<layer_tcp::LayerTcpType>,
     // special fields
-    // @@protoc_insertion_point(special_field:protocol.LayerTcp.special_fields)
+    // @@protoc_insertion_point(special_field:protocol.tcp.LayerTcp.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -505,76 +1252,76 @@ impl LayerTcp {
     // int32 port_subscribe = 1;
 
     pub fn port_subscribe(&self) -> i32 {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::PortSubscribe(v)) => v,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::PortSubscribe(v)) => v,
             _ => 0,
         }
     }
 
     pub fn clear_port_subscribe(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
     }
 
     pub fn has_port_subscribe(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::PortSubscribe(..)) => true,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::PortSubscribe(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_port_subscribe(&mut self, v: i32) {
-        self.inner = ::std::option::Option::Some(layer_tcp::Inner::PortSubscribe(v))
+        self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::PortSubscribe(v))
     }
 
     // uint64 connection_unsubscribe = 2;
 
     pub fn connection_unsubscribe(&self) -> u64 {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::ConnectionUnsubscribe(v)) => v,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::ConnectionUnsubscribe(v)) => v,
             _ => 0,
         }
     }
 
     pub fn clear_connection_unsubscribe(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
     }
 
     pub fn has_connection_unsubscribe(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::ConnectionUnsubscribe(..)) => true,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::ConnectionUnsubscribe(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_connection_unsubscribe(&mut self, v: u64) {
-        self.inner = ::std::option::Option::Some(layer_tcp::Inner::ConnectionUnsubscribe(v))
+        self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::ConnectionUnsubscribe(v))
     }
 
     // int32 port_unsubscribe = 3;
 
     pub fn port_unsubscribe(&self) -> i32 {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::PortUnsubscribe(v)) => v,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::PortUnsubscribe(v)) => v,
             _ => 0,
         }
     }
 
     pub fn clear_port_unsubscribe(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
     }
 
     pub fn has_port_unsubscribe(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(layer_tcp::Inner::PortUnsubscribe(..)) => true,
+        match self.layerTcpType {
+            ::std::option::Option::Some(layer_tcp::LayerTcpType::PortUnsubscribe(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_port_unsubscribe(&mut self, v: i32) {
-        self.inner = ::std::option::Option::Some(layer_tcp::Inner::PortUnsubscribe(v))
+        self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::PortUnsubscribe(v))
     }
 
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
@@ -598,7 +1345,7 @@ impl LayerTcp {
             LayerTcp::port_unsubscribe,
             LayerTcp::set_port_unsubscribe,
         ));
-        oneofs.push(layer_tcp::Inner::generated_oneof_descriptor_data());
+        oneofs.push(layer_tcp::LayerTcpType::generated_oneof_descriptor_data());
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<LayerTcp>(
             "LayerTcp",
             fields,
@@ -618,13 +1365,13 @@ impl ::protobuf::Message for LayerTcp {
         while let Some(tag) = is.read_raw_tag_or_eof()? {
             match tag {
                 8 => {
-                    self.inner = ::std::option::Option::Some(layer_tcp::Inner::PortSubscribe(is.read_int32()?));
+                    self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::PortSubscribe(is.read_int32()?));
                 },
                 16 => {
-                    self.inner = ::std::option::Option::Some(layer_tcp::Inner::ConnectionUnsubscribe(is.read_uint64()?));
+                    self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::ConnectionUnsubscribe(is.read_uint64()?));
                 },
                 24 => {
-                    self.inner = ::std::option::Option::Some(layer_tcp::Inner::PortUnsubscribe(is.read_int32()?));
+                    self.layerTcpType = ::std::option::Option::Some(layer_tcp::LayerTcpType::PortUnsubscribe(is.read_int32()?));
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -638,15 +1385,15 @@ impl ::protobuf::Message for LayerTcp {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u64 {
         let mut my_size = 0;
-        if let ::std::option::Option::Some(ref v) = self.inner {
+        if let ::std::option::Option::Some(ref v) = self.layerTcpType {
             match v {
-                &layer_tcp::Inner::PortSubscribe(v) => {
+                &layer_tcp::LayerTcpType::PortSubscribe(v) => {
                     my_size += ::protobuf::rt::int32_size(1, v);
                 },
-                &layer_tcp::Inner::ConnectionUnsubscribe(v) => {
+                &layer_tcp::LayerTcpType::ConnectionUnsubscribe(v) => {
                     my_size += ::protobuf::rt::uint64_size(2, v);
                 },
-                &layer_tcp::Inner::PortUnsubscribe(v) => {
+                &layer_tcp::LayerTcpType::PortUnsubscribe(v) => {
                     my_size += ::protobuf::rt::int32_size(3, v);
                 },
             };
@@ -657,15 +1404,15 @@ impl ::protobuf::Message for LayerTcp {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
-        if let ::std::option::Option::Some(ref v) = self.inner {
+        if let ::std::option::Option::Some(ref v) = self.layerTcpType {
             match v {
-                &layer_tcp::Inner::PortSubscribe(v) => {
+                &layer_tcp::LayerTcpType::PortSubscribe(v) => {
                     os.write_int32(1, v)?;
                 },
-                &layer_tcp::Inner::ConnectionUnsubscribe(v) => {
+                &layer_tcp::LayerTcpType::ConnectionUnsubscribe(v) => {
                     os.write_uint64(2, v)?;
                 },
-                &layer_tcp::Inner::PortUnsubscribe(v) => {
+                &layer_tcp::LayerTcpType::PortUnsubscribe(v) => {
                     os.write_int32(3, v)?;
                 },
             };
@@ -687,15 +1434,15 @@ impl ::protobuf::Message for LayerTcp {
     }
 
     fn clear(&mut self) {
-        self.inner = ::std::option::Option::None;
-        self.inner = ::std::option::Option::None;
-        self.inner = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
+        self.layerTcpType = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
     fn default_instance() -> &'static LayerTcp {
         static instance: LayerTcp = LayerTcp {
-            inner: ::std::option::Option::None,
+            layerTcpType: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -724,40 +1471,40 @@ pub mod layer_tcp {
 
     #[derive(Clone,PartialEq,Debug)]
     #[non_exhaustive]
-    // @@protoc_insertion_point(oneof:protocol.LayerTcp.inner)
-    pub enum Inner {
-        // @@protoc_insertion_point(oneof_field:protocol.LayerTcp.port_subscribe)
+    // @@protoc_insertion_point(oneof:protocol.tcp.LayerTcp.layerTcpType)
+    pub enum LayerTcpType {
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.LayerTcp.port_subscribe)
         PortSubscribe(i32),
-        // @@protoc_insertion_point(oneof_field:protocol.LayerTcp.connection_unsubscribe)
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.LayerTcp.connection_unsubscribe)
         ConnectionUnsubscribe(u64),
-        // @@protoc_insertion_point(oneof_field:protocol.LayerTcp.port_unsubscribe)
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.LayerTcp.port_unsubscribe)
         PortUnsubscribe(i32),
     }
 
-    impl ::protobuf::Oneof for Inner {
+    impl ::protobuf::Oneof for LayerTcpType {
     }
 
-    impl ::protobuf::OneofFull for Inner {
+    impl ::protobuf::OneofFull for LayerTcpType {
         fn descriptor() -> ::protobuf::reflect::OneofDescriptor {
             static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::OneofDescriptor> = ::protobuf::rt::Lazy::new();
-            descriptor.get(|| <super::LayerTcp as ::protobuf::MessageFull>::descriptor().oneof_by_name("inner").unwrap()).clone()
+            descriptor.get(|| <super::LayerTcp as ::protobuf::MessageFull>::descriptor().oneof_by_name("layerTcpType").unwrap()).clone()
         }
     }
 
-    impl Inner {
+    impl LayerTcpType {
         pub(in super) fn generated_oneof_descriptor_data() -> ::protobuf::reflect::GeneratedOneofDescriptorData {
-            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<Inner>("inner")
+            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<LayerTcpType>("layerTcpType")
         }
     }
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:protocol.DaemonTcp)
+// @@protoc_insertion_point(message:protocol.tcp.DaemonTcp)
 pub struct DaemonTcp {
     // message oneof groups
-    pub inner: ::std::option::Option<daemon_tcp::Inner>,
+    pub daemonTcpType: ::std::option::Option<daemon_tcp::DaemonTcpType>,
     // special fields
-    // @@protoc_insertion_point(special_field:protocol.DaemonTcp.special_fields)
+    // @@protoc_insertion_point(special_field:protocol.tcp.DaemonTcp.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -772,39 +1519,39 @@ impl DaemonTcp {
         ::std::default::Default::default()
     }
 
-    // .protocol.NewTcpConnection new_tcp_connection = 1;
+    // .protocol.tcp.NewTcpConnection new_tcp_connection = 1;
 
     pub fn new_tcp_connection(&self) -> &NewTcpConnection {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(ref v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(ref v)) => v,
             _ => <NewTcpConnection as ::protobuf::Message>::default_instance(),
         }
     }
 
     pub fn clear_new_tcp_connection(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
     }
 
     pub fn has_new_tcp_connection(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(..)) => true,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_new_tcp_connection(&mut self, v: NewTcpConnection) {
-        self.inner = ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(v))
+        self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(v))
     }
 
     // Mutable pointer to the field.
     pub fn mut_new_tcp_connection(&mut self) -> &mut NewTcpConnection {
-        if let ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(_)) = self.inner {
+        if let ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(_)) = self.daemonTcpType {
         } else {
-            self.inner = ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(NewTcpConnection::new()));
+            self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(NewTcpConnection::new()));
         }
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(ref mut v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(ref mut v)) => v,
             _ => panic!(),
         }
     }
@@ -812,8 +1559,8 @@ impl DaemonTcp {
     // Take field
     pub fn take_new_tcp_connection(&mut self) -> NewTcpConnection {
         if self.has_new_tcp_connection() {
-            match self.inner.take() {
-                ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(v)) => v,
+            match self.daemonTcpType.take() {
+                ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(v)) => v,
                 _ => panic!(),
             }
         } else {
@@ -821,39 +1568,39 @@ impl DaemonTcp {
         }
     }
 
-    // .protocol.TcpData tcp_data = 2;
+    // .protocol.tcp.TcpData tcp_data = 2;
 
     pub fn tcp_data(&self) -> &TcpData {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpData(ref v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(ref v)) => v,
             _ => <TcpData as ::protobuf::Message>::default_instance(),
         }
     }
 
     pub fn clear_tcp_data(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
     }
 
     pub fn has_tcp_data(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpData(..)) => true,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_tcp_data(&mut self, v: TcpData) {
-        self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpData(v))
+        self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(v))
     }
 
     // Mutable pointer to the field.
     pub fn mut_tcp_data(&mut self) -> &mut TcpData {
-        if let ::std::option::Option::Some(daemon_tcp::Inner::TcpData(_)) = self.inner {
+        if let ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(_)) = self.daemonTcpType {
         } else {
-            self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpData(TcpData::new()));
+            self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(TcpData::new()));
         }
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpData(ref mut v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(ref mut v)) => v,
             _ => panic!(),
         }
     }
@@ -861,8 +1608,8 @@ impl DaemonTcp {
     // Take field
     pub fn take_tcp_data(&mut self) -> TcpData {
         if self.has_tcp_data() {
-            match self.inner.take() {
-                ::std::option::Option::Some(daemon_tcp::Inner::TcpData(v)) => v,
+            match self.daemonTcpType.take() {
+                ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(v)) => v,
                 _ => panic!(),
             }
         } else {
@@ -870,39 +1617,39 @@ impl DaemonTcp {
         }
     }
 
-    // .protocol.TcpClose tcp_close = 3;
+    // .protocol.tcp.TcpClose tcp_close = 3;
 
     pub fn tcp_close(&self) -> &TcpClose {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(ref v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(ref v)) => v,
             _ => <TcpClose as ::protobuf::Message>::default_instance(),
         }
     }
 
     pub fn clear_tcp_close(&mut self) {
-        self.inner = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
     }
 
     pub fn has_tcp_close(&self) -> bool {
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(..)) => true,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(..)) => true,
             _ => false,
         }
     }
 
     // Param is passed by value, moved
     pub fn set_tcp_close(&mut self, v: TcpClose) {
-        self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(v))
+        self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(v))
     }
 
     // Mutable pointer to the field.
     pub fn mut_tcp_close(&mut self) -> &mut TcpClose {
-        if let ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(_)) = self.inner {
+        if let ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(_)) = self.daemonTcpType {
         } else {
-            self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(TcpClose::new()));
+            self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(TcpClose::new()));
         }
-        match self.inner {
-            ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(ref mut v)) => v,
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(ref mut v)) => v,
             _ => panic!(),
         }
     }
@@ -910,8 +1657,8 @@ impl DaemonTcp {
     // Take field
     pub fn take_tcp_close(&mut self) -> TcpClose {
         if self.has_tcp_close() {
-            match self.inner.take() {
-                ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(v)) => v,
+            match self.daemonTcpType.take() {
+                ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(v)) => v,
                 _ => panic!(),
             }
         } else {
@@ -919,8 +1666,106 @@ impl DaemonTcp {
         }
     }
 
+    // .protocol.tcp.SubscribeResult subscribe_result = 4;
+
+    pub fn subscribe_result(&self) -> &SubscribeResult {
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(ref v)) => v,
+            _ => <SubscribeResult as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_subscribe_result(&mut self) {
+        self.daemonTcpType = ::std::option::Option::None;
+    }
+
+    pub fn has_subscribe_result(&self) -> bool {
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_subscribe_result(&mut self, v: SubscribeResult) {
+        self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_subscribe_result(&mut self) -> &mut SubscribeResult {
+        if let ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(_)) = self.daemonTcpType {
+        } else {
+            self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(SubscribeResult::new()));
+        }
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_subscribe_result(&mut self) -> SubscribeResult {
+        if self.has_subscribe_result() {
+            match self.daemonTcpType.take() {
+                ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            SubscribeResult::new()
+        }
+    }
+
+    // .protocol.tcp.HttpRequest http_request = 5;
+
+    pub fn http_request(&self) -> &HttpRequest {
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(ref v)) => v,
+            _ => <HttpRequest as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_http_request(&mut self) {
+        self.daemonTcpType = ::std::option::Option::None;
+    }
+
+    pub fn has_http_request(&self) -> bool {
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_http_request(&mut self, v: HttpRequest) {
+        self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_http_request(&mut self) -> &mut HttpRequest {
+        if let ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(_)) = self.daemonTcpType {
+        } else {
+            self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(HttpRequest::new()));
+        }
+        match self.daemonTcpType {
+            ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_http_request(&mut self) -> HttpRequest {
+        if self.has_http_request() {
+            match self.daemonTcpType.take() {
+                ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            HttpRequest::new()
+        }
+    }
+
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
-        let mut fields = ::std::vec::Vec::with_capacity(3);
+        let mut fields = ::std::vec::Vec::with_capacity(5);
         let mut oneofs = ::std::vec::Vec::with_capacity(1);
         fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, NewTcpConnection>(
             "new_tcp_connection",
@@ -943,7 +1788,21 @@ impl DaemonTcp {
             DaemonTcp::mut_tcp_close,
             DaemonTcp::set_tcp_close,
         ));
-        oneofs.push(daemon_tcp::Inner::generated_oneof_descriptor_data());
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, SubscribeResult>(
+            "subscribe_result",
+            DaemonTcp::has_subscribe_result,
+            DaemonTcp::subscribe_result,
+            DaemonTcp::mut_subscribe_result,
+            DaemonTcp::set_subscribe_result,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, HttpRequest>(
+            "http_request",
+            DaemonTcp::has_http_request,
+            DaemonTcp::http_request,
+            DaemonTcp::mut_http_request,
+            DaemonTcp::set_http_request,
+        ));
+        oneofs.push(daemon_tcp::DaemonTcpType::generated_oneof_descriptor_data());
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<DaemonTcp>(
             "DaemonTcp",
             fields,
@@ -963,13 +1822,19 @@ impl ::protobuf::Message for DaemonTcp {
         while let Some(tag) = is.read_raw_tag_or_eof()? {
             match tag {
                 10 => {
-                    self.inner = ::std::option::Option::Some(daemon_tcp::Inner::NewTcpConnection(is.read_message()?));
+                    self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::NewTcpConnection(is.read_message()?));
                 },
                 18 => {
-                    self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpData(is.read_message()?));
+                    self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpData(is.read_message()?));
                 },
                 26 => {
-                    self.inner = ::std::option::Option::Some(daemon_tcp::Inner::TcpClose(is.read_message()?));
+                    self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::TcpClose(is.read_message()?));
+                },
+                34 => {
+                    self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::SubscribeResult(is.read_message()?));
+                },
+                42 => {
+                    self.daemonTcpType = ::std::option::Option::Some(daemon_tcp::DaemonTcpType::HttpRequest(is.read_message()?));
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -983,17 +1848,25 @@ impl ::protobuf::Message for DaemonTcp {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u64 {
         let mut my_size = 0;
-        if let ::std::option::Option::Some(ref v) = self.inner {
+        if let ::std::option::Option::Some(ref v) = self.daemonTcpType {
             match v {
-                &daemon_tcp::Inner::NewTcpConnection(ref v) => {
+                &daemon_tcp::DaemonTcpType::NewTcpConnection(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
                 },
-                &daemon_tcp::Inner::TcpData(ref v) => {
+                &daemon_tcp::DaemonTcpType::TcpData(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
                 },
-                &daemon_tcp::Inner::TcpClose(ref v) => {
+                &daemon_tcp::DaemonTcpType::TcpClose(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+                &daemon_tcp::DaemonTcpType::SubscribeResult(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+                &daemon_tcp::DaemonTcpType::HttpRequest(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
                 },
@@ -1005,16 +1878,22 @@ impl ::protobuf::Message for DaemonTcp {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
-        if let ::std::option::Option::Some(ref v) = self.inner {
+        if let ::std::option::Option::Some(ref v) = self.daemonTcpType {
             match v {
-                &daemon_tcp::Inner::NewTcpConnection(ref v) => {
+                &daemon_tcp::DaemonTcpType::NewTcpConnection(ref v) => {
                     ::protobuf::rt::write_message_field_with_cached_size(1, v, os)?;
                 },
-                &daemon_tcp::Inner::TcpData(ref v) => {
+                &daemon_tcp::DaemonTcpType::TcpData(ref v) => {
                     ::protobuf::rt::write_message_field_with_cached_size(2, v, os)?;
                 },
-                &daemon_tcp::Inner::TcpClose(ref v) => {
+                &daemon_tcp::DaemonTcpType::TcpClose(ref v) => {
                     ::protobuf::rt::write_message_field_with_cached_size(3, v, os)?;
+                },
+                &daemon_tcp::DaemonTcpType::SubscribeResult(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+                },
+                &daemon_tcp::DaemonTcpType::HttpRequest(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(5, v, os)?;
                 },
             };
         }
@@ -1035,15 +1914,17 @@ impl ::protobuf::Message for DaemonTcp {
     }
 
     fn clear(&mut self) {
-        self.inner = ::std::option::Option::None;
-        self.inner = ::std::option::Option::None;
-        self.inner = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
+        self.daemonTcpType = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
     fn default_instance() -> &'static DaemonTcp {
         static instance: DaemonTcp = DaemonTcp {
-            inner: ::std::option::Option::None,
+            daemonTcpType: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -1072,98 +1953,160 @@ pub mod daemon_tcp {
 
     #[derive(Clone,PartialEq,Debug)]
     #[non_exhaustive]
-    // @@protoc_insertion_point(oneof:protocol.DaemonTcp.inner)
-    pub enum Inner {
-        // @@protoc_insertion_point(oneof_field:protocol.DaemonTcp.new_tcp_connection)
+    // @@protoc_insertion_point(oneof:protocol.tcp.DaemonTcp.daemonTcpType)
+    pub enum DaemonTcpType {
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.DaemonTcp.new_tcp_connection)
         NewTcpConnection(super::NewTcpConnection),
-        // @@protoc_insertion_point(oneof_field:protocol.DaemonTcp.tcp_data)
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.DaemonTcp.tcp_data)
         TcpData(super::TcpData),
-        // @@protoc_insertion_point(oneof_field:protocol.DaemonTcp.tcp_close)
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.DaemonTcp.tcp_close)
         TcpClose(super::TcpClose),
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.DaemonTcp.subscribe_result)
+        SubscribeResult(super::SubscribeResult),
+        // @@protoc_insertion_point(oneof_field:protocol.tcp.DaemonTcp.http_request)
+        HttpRequest(super::HttpRequest),
     }
 
-    impl ::protobuf::Oneof for Inner {
+    impl ::protobuf::Oneof for DaemonTcpType {
     }
 
-    impl ::protobuf::OneofFull for Inner {
+    impl ::protobuf::OneofFull for DaemonTcpType {
         fn descriptor() -> ::protobuf::reflect::OneofDescriptor {
             static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::OneofDescriptor> = ::protobuf::rt::Lazy::new();
-            descriptor.get(|| <super::DaemonTcp as ::protobuf::MessageFull>::descriptor().oneof_by_name("inner").unwrap()).clone()
+            descriptor.get(|| <super::DaemonTcp as ::protobuf::MessageFull>::descriptor().oneof_by_name("daemonTcpType").unwrap()).clone()
         }
     }
 
-    impl Inner {
+    impl DaemonTcpType {
         pub(in super) fn generated_oneof_descriptor_data() -> ::protobuf::reflect::GeneratedOneofDescriptorData {
-            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<Inner>("inner")
+            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<DaemonTcpType>("daemonTcpType")
         }
     }
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0fproto/tcp.proto\x12\x08protocol\"\xcf\x01\n\x10NewTcpConnection\
-    \x12#\n\rconnection_id\x18\x01\x20\x01(\x04R\x0cconnectionId\x12%\n\x0er\
-    emote_address\x18\x02\x20\x01(\x0cR\rremoteAddress\x12)\n\x10destination\
-    _port\x18\x03\x20\x01(\x05R\x0fdestinationPort\x12\x1f\n\x0bsource_port\
-    \x18\x04\x20\x01(\x05R\nsourcePort\x12#\n\rlocal_address\x18\x05\x20\x01\
-    (\x0cR\x0clocalAddress\"D\n\x07TcpData\x12#\n\rconnection_id\x18\x01\x20\
-    \x01(\x04R\x0cconnectionId\x12\x14\n\x05bytes\x18\x02\x20\x01(\x0cR\x05b\
-    ytes\"/\n\x08TcpClose\x12#\n\rconnection_id\x18\x01\x20\x01(\x04R\x0ccon\
-    nectionId\"\xa2\x01\n\x08LayerTcp\x12'\n\x0eport_subscribe\x18\x01\x20\
-    \x01(\x05H\0R\rportSubscribe\x127\n\x16connection_unsubscribe\x18\x02\
-    \x20\x01(\x04H\0R\x15connectionUnsubscribe\x12+\n\x10port_unsubscribe\
-    \x18\x03\x20\x01(\x05H\0R\x0fportUnsubscribeB\x07\n\x05inner\"\xc3\x01\n\
-    \tDaemonTcp\x12J\n\x12new_tcp_connection\x18\x01\x20\x01(\x0b2\x1a.proto\
-    col.NewTcpConnectionH\0R\x10newTcpConnection\x12.\n\x08tcp_data\x18\x02\
-    \x20\x01(\x0b2\x11.protocol.TcpDataH\0R\x07tcpData\x121\n\ttcp_close\x18\
-    \x03\x20\x01(\x0b2\x12.protocol.TcpCloseH\0R\x08tcpCloseB\x07\n\x05inner\
-    J\xce\x07\n\x06\x12\x04\0\0#\x01\n\x08\n\x01\x0c\x12\x03\0\0\x12\n\x08\n\
-    \x01\x02\x12\x03\x02\0\x11\n\n\n\x02\x04\0\x12\x04\x04\0\n\x01\n\n\n\x03\
-    \x04\0\x01\x12\x03\x04\x08\x18\n\x0b\n\x04\x04\0\x02\0\x12\x03\x05\x08!\
-    \n\x0c\n\x05\x04\0\x02\0\x05\x12\x03\x05\x08\x0e\n\x0c\n\x05\x04\0\x02\0\
-    \x01\x12\x03\x05\x0f\x1c\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x05\x1f\x20\
-    \n\x0b\n\x04\x04\0\x02\x01\x12\x03\x06\x08!\n\x0c\n\x05\x04\0\x02\x01\
-    \x05\x12\x03\x06\x08\r\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x06\x0e\x1c\
-    \n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\x06\x1f\x20\n\x0b\n\x04\x04\0\x02\
-    \x02\x12\x03\x07\x08#\n\x0c\n\x05\x04\0\x02\x02\x05\x12\x03\x07\x08\r\n\
-    \x0c\n\x05\x04\0\x02\x02\x01\x12\x03\x07\x0e\x1e\n\x0c\n\x05\x04\0\x02\
-    \x02\x03\x12\x03\x07!\"\n\x0b\n\x04\x04\0\x02\x03\x12\x03\x08\x08\x1e\n\
-    \x0c\n\x05\x04\0\x02\x03\x05\x12\x03\x08\x08\r\n\x0c\n\x05\x04\0\x02\x03\
-    \x01\x12\x03\x08\x0e\x19\n\x0c\n\x05\x04\0\x02\x03\x03\x12\x03\x08\x1c\
-    \x1d\n\x0b\n\x04\x04\0\x02\x04\x12\x03\t\x08\x20\n\x0c\n\x05\x04\0\x02\
-    \x04\x05\x12\x03\t\x08\r\n\x0c\n\x05\x04\0\x02\x04\x01\x12\x03\t\x0e\x1b\
-    \n\x0c\n\x05\x04\0\x02\x04\x03\x12\x03\t\x1e\x1f\n\n\n\x02\x04\x01\x12\
-    \x04\x0c\0\x0f\x01\n\n\n\x03\x04\x01\x01\x12\x03\x0c\x08\x0f\n\x0b\n\x04\
-    \x04\x01\x02\0\x12\x03\r\x08!\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\r\
-    \x08\x0e\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03\r\x0f\x1c\n\x0c\n\x05\x04\
-    \x01\x02\0\x03\x12\x03\r\x1f\x20\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\x0e\
-    \x08\x18\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\x0e\x08\r\n\x0c\n\x05\
-    \x04\x01\x02\x01\x01\x12\x03\x0e\x0e\x13\n\x0c\n\x05\x04\x01\x02\x01\x03\
-    \x12\x03\x0e\x16\x17\n\n\n\x02\x04\x02\x12\x04\x11\0\x13\x01\n\n\n\x03\
-    \x04\x02\x01\x12\x03\x11\x08\x10\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x12\
-    \x08!\n\x0c\n\x05\x04\x02\x02\0\x05\x12\x03\x12\x08\x0e\n\x0c\n\x05\x04\
-    \x02\x02\0\x01\x12\x03\x12\x0f\x1c\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\
-    \x12\x1f\x20\n\n\n\x02\x04\x03\x12\x04\x15\0\x1b\x01\n\n\n\x03\x04\x03\
-    \x01\x12\x03\x15\x08\x10\n\x0c\n\x04\x04\x03\x08\0\x12\x04\x16\x08\x1a\t\
-    \n\x0c\n\x05\x04\x03\x08\0\x01\x12\x03\x16\x0e\x13\n\x0b\n\x04\x04\x03\
-    \x02\0\x12\x03\x17\x10)\n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x17\x10\
-    \x15\n\x0c\n\x05\x04\x03\x02\0\x01\x12\x03\x17\x16$\n\x0c\n\x05\x04\x03\
-    \x02\0\x03\x12\x03\x17'(\n\x0b\n\x04\x04\x03\x02\x01\x12\x03\x18\x102\n\
-    \x0c\n\x05\x04\x03\x02\x01\x05\x12\x03\x18\x10\x16\n\x0c\n\x05\x04\x03\
-    \x02\x01\x01\x12\x03\x18\x17-\n\x0c\n\x05\x04\x03\x02\x01\x03\x12\x03\
-    \x1801\n\x0b\n\x04\x04\x03\x02\x02\x12\x03\x19\x10+\n\x0c\n\x05\x04\x03\
-    \x02\x02\x05\x12\x03\x19\x10\x15\n\x0c\n\x05\x04\x03\x02\x02\x01\x12\x03\
-    \x19\x16&\n\x0c\n\x05\x04\x03\x02\x02\x03\x12\x03\x19)*\n\n\n\x02\x04\
-    \x04\x12\x04\x1d\0#\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1d\x08\x11\n\x0c\
-    \n\x04\x04\x04\x08\0\x12\x04\x1e\x08\"\t\n\x0c\n\x05\x04\x04\x08\0\x01\
-    \x12\x03\x1e\x0e\x13\n\x0b\n\x04\x04\x04\x02\0\x12\x03\x1f\x108\n\x0c\n\
-    \x05\x04\x04\x02\0\x06\x12\x03\x1f\x10\x20\n\x0c\n\x05\x04\x04\x02\0\x01\
-    \x12\x03\x1f!3\n\x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1f67\n\x0b\n\x04\
-    \x04\x04\x02\x01\x12\x03\x20\x10%\n\x0c\n\x05\x04\x04\x02\x01\x06\x12\
-    \x03\x20\x10\x17\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x03\x20\x18\x20\n\
-    \x0c\n\x05\x04\x04\x02\x01\x03\x12\x03\x20#$\n\x0b\n\x04\x04\x04\x02\x02\
-    \x12\x03!\x10'\n\x0c\n\x05\x04\x04\x02\x02\x06\x12\x03!\x10\x18\n\x0c\n\
-    \x05\x04\x04\x02\x02\x01\x12\x03!\x19\"\n\x0c\n\x05\x04\x04\x02\x02\x03\
-    \x12\x03!%&b\x06proto3\
+    \n\ttcp.proto\x12\x0cprotocol.tcp\x1a\x0berror.proto\"\xcf\x01\n\x10NewT\
+    cpConnection\x12#\n\rconnection_id\x18\x01\x20\x01(\x04R\x0cconnectionId\
+    \x12%\n\x0eremote_address\x18\x02\x20\x01(\x0cR\rremoteAddress\x12)\n\
+    \x10destination_port\x18\x03\x20\x01(\x05R\x0fdestinationPort\x12\x1f\n\
+    \x0bsource_port\x18\x04\x20\x01(\x05R\nsourcePort\x12#\n\rlocal_address\
+    \x18\x05\x20\x01(\x0cR\x0clocalAddress\"D\n\x07TcpData\x12#\n\rconnectio\
+    n_id\x18\x01\x20\x01(\x04R\x0cconnectionId\x12\x14\n\x05bytes\x18\x02\
+    \x20\x01(\x0cR\x05bytes\"/\n\x08TcpClose\x12#\n\rconnection_id\x18\x01\
+    \x20\x01(\x04R\x0cconnectionId\"`\n\x0fSubscribeResult\x12\x10\n\x02ok\
+    \x18\x01\x20\x01(\x05H\0R\x02ok\x121\n\x03err\x18\x02\x20\x01(\x0b2\x1d.\
+    protocol.error.ResponseErrorH\0R\x03errB\x08\n\x06result\"2\n\x06Header\
+    \x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\x14\n\x05value\x18\
+    \x02\x20\x01(\tR\x05value\"\x8c\x01\n\x14InternalHttpResponse\x12\x16\n\
+    \x06status\x18\x01\x20\x01(\x05R\x06status\x12\x18\n\x07version\x18\x02\
+    \x20\x01(\tR\x07version\x12.\n\x07headers\x18\x03\x20\x03(\x0b2\x14.prot\
+    ocol.tcp.HeaderR\x07headers\x12\x12\n\x04body\x18\x04\x20\x01(\x0cR\x04b\
+    ody\"\xb6\x01\n\x0bHttpRequest\x12#\n\rconnection_id\x18\x01\x20\x01(\
+    \x04R\x0cconnectionId\x12\x1d\n\nrequest_id\x18\x02\x20\x01(\x05R\treque\
+    stId\x12\x12\n\x04port\x18\x03\x20\x01(\x05R\x04port\x12O\n\x11internal_\
+    response\x18\x04\x20\x01(\x0b2\".protocol.tcp.InternalHttpResponseR\x10i\
+    nternalResponse\"\xa9\x01\n\x08LayerTcp\x12'\n\x0eport_subscribe\x18\x01\
+    \x20\x01(\x05H\0R\rportSubscribe\x127\n\x16connection_unsubscribe\x18\
+    \x02\x20\x01(\x04H\0R\x15connectionUnsubscribe\x12+\n\x10port_unsubscrib\
+    e\x18\x03\x20\x01(\x05H\0R\x0fportUnsubscribeB\x0e\n\x0clayerTcpType\"\
+    \xe3\x02\n\tDaemonTcp\x12N\n\x12new_tcp_connection\x18\x01\x20\x01(\x0b2\
+    \x1e.protocol.tcp.NewTcpConnectionH\0R\x10newTcpConnection\x122\n\x08tcp\
+    _data\x18\x02\x20\x01(\x0b2\x15.protocol.tcp.TcpDataH\0R\x07tcpData\x125\
+    \n\ttcp_close\x18\x03\x20\x01(\x0b2\x16.protocol.tcp.TcpCloseH\0R\x08tcp\
+    Close\x12J\n\x10subscribe_result\x18\x04\x20\x01(\x0b2\x1d.protocol.tcp.\
+    SubscribeResultH\0R\x0fsubscribeResult\x12>\n\x0chttp_request\x18\x05\
+    \x20\x01(\x0b2\x19.protocol.tcp.HttpRequestH\0R\x0bhttpRequestB\x0f\n\rd\
+    aemonTcpTypeJ\xe5\x0e\n\x06\x12\x04\0\0A\x01\n\x08\n\x01\x0c\x12\x03\0\0\
+    \x12\n\x08\n\x01\x02\x12\x03\x02\0\x15\n\t\n\x02\x03\0\x12\x03\x04\0\x15\
+    \n\n\n\x02\x04\0\x12\x04\x06\0\x0c\x01\n\n\n\x03\x04\0\x01\x12\x03\x06\
+    \x08\x18\n\x0b\n\x04\x04\0\x02\0\x12\x03\x07\x08!\n\x0c\n\x05\x04\0\x02\
+    \0\x05\x12\x03\x07\x08\x0e\n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x07\x0f\
+    \x1c\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x07\x1f\x20\n\x0b\n\x04\x04\0\
+    \x02\x01\x12\x03\x08\x08!\n\x0c\n\x05\x04\0\x02\x01\x05\x12\x03\x08\x08\
+    \r\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\x08\x0e\x1c\n\x0c\n\x05\x04\0\
+    \x02\x01\x03\x12\x03\x08\x1f\x20\n\x0b\n\x04\x04\0\x02\x02\x12\x03\t\x08\
+    #\n\x0c\n\x05\x04\0\x02\x02\x05\x12\x03\t\x08\r\n\x0c\n\x05\x04\0\x02\
+    \x02\x01\x12\x03\t\x0e\x1e\n\x0c\n\x05\x04\0\x02\x02\x03\x12\x03\t!\"\n\
+    \x0b\n\x04\x04\0\x02\x03\x12\x03\n\x08\x1e\n\x0c\n\x05\x04\0\x02\x03\x05\
+    \x12\x03\n\x08\r\n\x0c\n\x05\x04\0\x02\x03\x01\x12\x03\n\x0e\x19\n\x0c\n\
+    \x05\x04\0\x02\x03\x03\x12\x03\n\x1c\x1d\n\x0b\n\x04\x04\0\x02\x04\x12\
+    \x03\x0b\x08\x20\n\x0c\n\x05\x04\0\x02\x04\x05\x12\x03\x0b\x08\r\n\x0c\n\
+    \x05\x04\0\x02\x04\x01\x12\x03\x0b\x0e\x1b\n\x0c\n\x05\x04\0\x02\x04\x03\
+    \x12\x03\x0b\x1e\x1f\n\n\n\x02\x04\x01\x12\x04\x0e\0\x11\x01\n\n\n\x03\
+    \x04\x01\x01\x12\x03\x0e\x08\x0f\n\x0b\n\x04\x04\x01\x02\0\x12\x03\x0f\
+    \x08!\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03\x0f\x08\x0e\n\x0c\n\x05\x04\
+    \x01\x02\0\x01\x12\x03\x0f\x0f\x1c\n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03\
+    \x0f\x1f\x20\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\x10\x08\x18\n\x0c\n\x05\
+    \x04\x01\x02\x01\x05\x12\x03\x10\x08\r\n\x0c\n\x05\x04\x01\x02\x01\x01\
+    \x12\x03\x10\x0e\x13\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\x10\x16\x17\
+    \n\n\n\x02\x04\x02\x12\x04\x13\0\x15\x01\n\n\n\x03\x04\x02\x01\x12\x03\
+    \x13\x08\x10\n\x0b\n\x04\x04\x02\x02\0\x12\x03\x14\x08!\n\x0c\n\x05\x04\
+    \x02\x02\0\x05\x12\x03\x14\x08\x0e\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03\
+    \x14\x0f\x1c\n\x0c\n\x05\x04\x02\x02\0\x03\x12\x03\x14\x1f\x20\n\n\n\x02\
+    \x04\x03\x12\x04\x17\0\x1c\x01\n\n\n\x03\x04\x03\x01\x12\x03\x17\x08\x17\
+    \n\x0c\n\x04\x04\x03\x08\0\x12\x04\x18\x08\x1b\t\n\x0c\n\x05\x04\x03\x08\
+    \0\x01\x12\x03\x18\x0e\x14\n\x0b\n\x04\x04\x03\x02\0\x12\x03\x19\x10\x1d\
+    \n\x0c\n\x05\x04\x03\x02\0\x05\x12\x03\x19\x10\x15\n\x0c\n\x05\x04\x03\
+    \x02\0\x01\x12\x03\x19\x16\x18\n\x0c\n\x05\x04\x03\x02\0\x03\x12\x03\x19\
+    \x1b\x1c\n\x0b\n\x04\x04\x03\x02\x01\x12\x03\x1a\x10,\n\x0c\n\x05\x04\
+    \x03\x02\x01\x06\x12\x03\x1a\x10#\n\x0c\n\x05\x04\x03\x02\x01\x01\x12\
+    \x03\x1a$'\n\x0c\n\x05\x04\x03\x02\x01\x03\x12\x03\x1a*+\n\n\n\x02\x04\
+    \x04\x12\x04\x1e\0!\x01\n\n\n\x03\x04\x04\x01\x12\x03\x1e\x08\x0e\n\x0b\
+    \n\x04\x04\x04\x02\0\x12\x03\x1f\x08\x18\n\x0c\n\x05\x04\x04\x02\0\x05\
+    \x12\x03\x1f\x08\x0e\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x03\x1f\x0f\x13\n\
+    \x0c\n\x05\x04\x04\x02\0\x03\x12\x03\x1f\x16\x17\n\x0b\n\x04\x04\x04\x02\
+    \x01\x12\x03\x20\x08\x19\n\x0c\n\x05\x04\x04\x02\x01\x05\x12\x03\x20\x08\
+    \x0e\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x03\x20\x0f\x14\n\x0c\n\x05\x04\
+    \x04\x02\x01\x03\x12\x03\x20\x17\x18\n\n\n\x02\x04\x05\x12\x04#\0(\x01\n\
+    \n\n\x03\x04\x05\x01\x12\x03#\x08\x1c\n\x0b\n\x04\x04\x05\x02\0\x12\x03$\
+    \x08\x19\n\x0c\n\x05\x04\x05\x02\0\x05\x12\x03$\x08\r\n\x0c\n\x05\x04\
+    \x05\x02\0\x01\x12\x03$\x0e\x14\n\x0c\n\x05\x04\x05\x02\0\x03\x12\x03$\
+    \x17\x18\n\x0b\n\x04\x04\x05\x02\x01\x12\x03%\x08\x1b\n\x0c\n\x05\x04\
+    \x05\x02\x01\x05\x12\x03%\x08\x0e\n\x0c\n\x05\x04\x05\x02\x01\x01\x12\
+    \x03%\x0f\x16\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x03%\x19\x1a\n\x0b\n\
+    \x04\x04\x05\x02\x02\x12\x03&\x08$\n\x0c\n\x05\x04\x05\x02\x02\x04\x12\
+    \x03&\x08\x10\n\x0c\n\x05\x04\x05\x02\x02\x06\x12\x03&\x11\x17\n\x0c\n\
+    \x05\x04\x05\x02\x02\x01\x12\x03&\x18\x1f\n\x0c\n\x05\x04\x05\x02\x02\
+    \x03\x12\x03&\"#\n\x0b\n\x04\x04\x05\x02\x03\x12\x03'\x08\x17\n\x0c\n\
+    \x05\x04\x05\x02\x03\x05\x12\x03'\x08\r\n\x0c\n\x05\x04\x05\x02\x03\x01\
+    \x12\x03'\x0e\x12\n\x0c\n\x05\x04\x05\x02\x03\x03\x12\x03'\x15\x16\n\n\n\
+    \x02\x04\x06\x12\x04*\0/\x01\n\n\n\x03\x04\x06\x01\x12\x03*\x08\x13\n\
+    \x0b\n\x04\x04\x06\x02\0\x12\x03+\x08!\n\x0c\n\x05\x04\x06\x02\0\x05\x12\
+    \x03+\x08\x0e\n\x0c\n\x05\x04\x06\x02\0\x01\x12\x03+\x0f\x1c\n\x0c\n\x05\
+    \x04\x06\x02\0\x03\x12\x03+\x1f\x20\n\x0b\n\x04\x04\x06\x02\x01\x12\x03,\
+    \x08\x1d\n\x0c\n\x05\x04\x06\x02\x01\x05\x12\x03,\x08\r\n\x0c\n\x05\x04\
+    \x06\x02\x01\x01\x12\x03,\x0e\x18\n\x0c\n\x05\x04\x06\x02\x01\x03\x12\
+    \x03,\x1b\x1c\n\x0b\n\x04\x04\x06\x02\x02\x12\x03-\x08\x17\n\x0c\n\x05\
+    \x04\x06\x02\x02\x05\x12\x03-\x08\r\n\x0c\n\x05\x04\x06\x02\x02\x01\x12\
+    \x03-\x0e\x12\n\x0c\n\x05\x04\x06\x02\x02\x03\x12\x03-\x15\x16\n\x0b\n\
+    \x04\x04\x06\x02\x03\x12\x03.\x083\n\x0c\n\x05\x04\x06\x02\x03\x06\x12\
+    \x03.\x08\x1c\n\x0c\n\x05\x04\x06\x02\x03\x01\x12\x03.\x1d.\n\x0c\n\x05\
+    \x04\x06\x02\x03\x03\x12\x03.12\n\n\n\x02\x04\x07\x12\x041\07\x01\n\n\n\
+    \x03\x04\x07\x01\x12\x031\x08\x10\n\x0c\n\x04\x04\x07\x08\0\x12\x042\x08\
+    6\t\n\x0c\n\x05\x04\x07\x08\0\x01\x12\x032\x0e\x1a\n\x0b\n\x04\x04\x07\
+    \x02\0\x12\x033\x10)\n\x0c\n\x05\x04\x07\x02\0\x05\x12\x033\x10\x15\n\
+    \x0c\n\x05\x04\x07\x02\0\x01\x12\x033\x16$\n\x0c\n\x05\x04\x07\x02\0\x03\
+    \x12\x033'(\n\x0b\n\x04\x04\x07\x02\x01\x12\x034\x102\n\x0c\n\x05\x04\
+    \x07\x02\x01\x05\x12\x034\x10\x16\n\x0c\n\x05\x04\x07\x02\x01\x01\x12\
+    \x034\x17-\n\x0c\n\x05\x04\x07\x02\x01\x03\x12\x03401\n\x0b\n\x04\x04\
+    \x07\x02\x02\x12\x035\x10+\n\x0c\n\x05\x04\x07\x02\x02\x05\x12\x035\x10\
+    \x15\n\x0c\n\x05\x04\x07\x02\x02\x01\x12\x035\x16&\n\x0c\n\x05\x04\x07\
+    \x02\x02\x03\x12\x035)*\n\n\n\x02\x04\x08\x12\x049\0A\x01\n\n\n\x03\x04\
+    \x08\x01\x12\x039\x08\x11\n\x0c\n\x04\x04\x08\x08\0\x12\x04:\x08@\t\n\
+    \x0c\n\x05\x04\x08\x08\0\x01\x12\x03:\x0e\x1b\n\x0b\n\x04\x04\x08\x02\0\
+    \x12\x03;\x108\n\x0c\n\x05\x04\x08\x02\0\x06\x12\x03;\x10\x20\n\x0c\n\
+    \x05\x04\x08\x02\0\x01\x12\x03;!3\n\x0c\n\x05\x04\x08\x02\0\x03\x12\x03;\
+    67\n\x0b\n\x04\x04\x08\x02\x01\x12\x03<\x10%\n\x0c\n\x05\x04\x08\x02\x01\
+    \x06\x12\x03<\x10\x17\n\x0c\n\x05\x04\x08\x02\x01\x01\x12\x03<\x18\x20\n\
+    \x0c\n\x05\x04\x08\x02\x01\x03\x12\x03<#$\n\x0b\n\x04\x04\x08\x02\x02\
+    \x12\x03=\x10'\n\x0c\n\x05\x04\x08\x02\x02\x06\x12\x03=\x10\x18\n\x0c\n\
+    \x05\x04\x08\x02\x02\x01\x12\x03=\x19\"\n\x0c\n\x05\x04\x08\x02\x02\x03\
+    \x12\x03=%&\n\x0b\n\x04\x04\x08\x02\x03\x12\x03>\x105\n\x0c\n\x05\x04\
+    \x08\x02\x03\x06\x12\x03>\x10\x1f\n\x0c\n\x05\x04\x08\x02\x03\x01\x12\
+    \x03>\x200\n\x0c\n\x05\x04\x08\x02\x03\x03\x12\x03>34\n\x0b\n\x04\x04\
+    \x08\x02\x04\x12\x03?\x10-\n\x0c\n\x05\x04\x08\x02\x04\x06\x12\x03?\x10\
+    \x1b\n\x0c\n\x05\x04\x08\x02\x04\x01\x12\x03?\x1c(\n\x0c\n\x05\x04\x08\
+    \x02\x04\x03\x12\x03?+,b\x06proto3\
 ";
 
 /// `FileDescriptorProto` object which was a source for this generated file
@@ -1180,11 +2123,16 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
     static file_descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::FileDescriptor> = ::protobuf::rt::Lazy::new();
     file_descriptor.get(|| {
         let generated_file_descriptor = generated_file_descriptor_lazy.get(|| {
-            let mut deps = ::std::vec::Vec::with_capacity(0);
-            let mut messages = ::std::vec::Vec::with_capacity(5);
+            let mut deps = ::std::vec::Vec::with_capacity(1);
+            deps.push(super::error::file_descriptor().clone());
+            let mut messages = ::std::vec::Vec::with_capacity(9);
             messages.push(NewTcpConnection::generated_message_descriptor_data());
             messages.push(TcpData::generated_message_descriptor_data());
             messages.push(TcpClose::generated_message_descriptor_data());
+            messages.push(SubscribeResult::generated_message_descriptor_data());
+            messages.push(Header::generated_message_descriptor_data());
+            messages.push(InternalHttpResponse::generated_message_descriptor_data());
+            messages.push(HttpRequest::generated_message_descriptor_data());
             messages.push(LayerTcp::generated_message_descriptor_data());
             messages.push(DaemonTcp::generated_message_descriptor_data());
             let mut enums = ::std::vec::Vec::with_capacity(0);

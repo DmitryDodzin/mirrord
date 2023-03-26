@@ -9,6 +9,14 @@ pub mod file;
 pub mod outgoing;
 pub mod proto;
 pub mod tcp;
+pub mod prost {
+    pub mod error {
+        include!(concat!(env!("OUT_DIR"), "/protocol.error.rs"));
+    }
+    pub mod tcp {
+        include!(concat!(env!("OUT_DIR"), "/protocol.tcp.rs"));
+    }
+}
 
 use std::{collections::HashSet, ops::Deref};
 
