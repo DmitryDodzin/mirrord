@@ -516,13 +516,6 @@
 <a href="#516" id="516">516</a>
 <a href="#517" id="517">517</a>
 <a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
-<a href="#521" id="521">521</a>
-<a href="#522" id="522">522</a>
-<a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
 </pre><pre class="rust"><code><span class="kw">use </span>core::ffi::CStr;
 <span class="kw">use </span>std::{ffi::CString, io::SeekFrom, os::unix::io::RawFd, path::PathBuf};
 
@@ -591,8 +584,7 @@
     <span class="comment">// don&#39;t add a trace here since it causes deadlocks in some cases.
     </span>Detour::Success(
         OPEN_FILES
-            .lock()<span class="question-mark">?
-            </span>.get(<span class="kw-2">&amp;</span>local_fd)
+            .get(<span class="kw-2">&amp;</span>local_fd)
             .map(|remote_file| remote_file.fd)
             <span class="comment">// Bypass if we&#39;re not managing the relative part.
             </span>.ok_or(Bypass::LocalFdNotFound(local_fd))<span class="question-mark">?</span>,
@@ -680,7 +672,7 @@
     </span><span class="kw">let </span>fake_local_file_name = CString::new(remote_fd.to_string())<span class="question-mark">?</span>;
     <span class="kw">let </span>local_file_fd = <span class="kw">unsafe </span>{ create_local_fake_file(fake_local_file_name, remote_fd) }<span class="question-mark">?</span>;
 
-    OPEN_FILES.lock().unwrap().insert(
+    OPEN_FILES.insert(
         local_file_fd,
         Arc::new(RemoteFile::new(remote_fd, path.display().to_string())),
     );
@@ -710,11 +702,9 @@
     <span class="comment">// TODO: Check that the constraint: remote file must have the same mode stuff that is passed
     // here.
     </span><span class="kw">let </span>result = OPEN_FILES
-        .lock()<span class="question-mark">?
-        </span>.get_key_value(<span class="kw-2">&amp;</span>fd)
+        .get(<span class="kw-2">&amp;</span>fd)
         .ok_or(Bypass::LocalFdNotFound(fd))
-        .inspect(|(local_fd, remote_fd)| <span class="macro">trace!</span>(<span class="string">&quot;fdopen -&gt; {local_fd:#?} {remote_fd:#?}&quot;</span>))
-        .map(|(local_fd, <span class="kw">_</span>)| local_fd <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)<span class="question-mark">?</span>;
+        .map(|<span class="kw">_</span>| fd <span class="kw">as </span><span class="kw-2">*const </span>RawFd <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>)<span class="question-mark">?</span>;
 
     Detour::Success(result)
 }
@@ -725,11 +715,7 @@
     <span class="comment">// usize == ptr size
     // we don&#39;t return a pointer to an address that contains DIR
 
-    </span><span class="kw">let </span>remote_file_fd = OPEN_FILES
-        .lock()<span class="question-mark">?
-        </span>.get(<span class="kw-2">&amp;</span>fd)
-        .ok_or(Bypass::LocalFdNotFound(fd))<span class="question-mark">?
-        </span>.fd;
+    </span><span class="kw">let </span>remote_file_fd = OPEN_FILES.get(<span class="kw-2">&amp;</span>fd).ok_or(Bypass::LocalFdNotFound(fd))<span class="question-mark">?</span>.fd;
 
     <span class="kw">let </span>(dir_channel_tx, dir_channel_rx) = oneshot::channel();
 
@@ -749,7 +735,7 @@
         </span>.insert(local_dir_fd <span class="kw">as </span>usize, remote_dir_fd);
 
     <span class="comment">// According to docs, when using fdopendir, the fd is now managed by OS - i.e closed
-    </span>OPEN_FILES.lock()<span class="question-mark">?</span>.remove(<span class="kw-2">&amp;</span>fd);
+    </span>OPEN_FILES.remove(<span class="kw-2">&amp;</span>fd);
 
     Detour::Success(local_dir_fd <span class="kw">as </span>usize)
 }
@@ -821,7 +807,7 @@
         <span class="kw">let </span>fake_local_file_name = CString::new(remote_fd.to_string())<span class="question-mark">?</span>;
         <span class="kw">let </span>local_file_fd = <span class="kw">unsafe </span>{ create_local_fake_file(fake_local_file_name, remote_fd) }<span class="question-mark">?</span>;
 
-        OPEN_FILES.lock()<span class="question-mark">?</span>.insert(
+        OPEN_FILES.insert(
             local_file_fd,
             Arc::new(RemoteFile::new(remote_fd, path.display().to_string())),
         );
