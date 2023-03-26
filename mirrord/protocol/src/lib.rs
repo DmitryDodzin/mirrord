@@ -8,6 +8,7 @@ pub mod error;
 pub mod file;
 pub mod outgoing;
 pub mod proto;
+pub mod std_types;
 pub mod tcp;
 pub mod prost {
     pub mod error {
@@ -16,6 +17,7 @@ pub mod prost {
     pub mod tcp {
         include!(concat!(env!("OUT_DIR"), "/protocol.tcp.rs"));
     }
+    pub use super::std_types;
 }
 
 use std::{collections::HashSet, ops::Deref};

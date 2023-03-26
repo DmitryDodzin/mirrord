@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protocol.error;
 
+import "std_types.proto";
+
 enum ErrorKind {
 	NotFound = 0;
     PermissionDenied = 1;
@@ -83,8 +85,8 @@ message RemoteError {
 	oneof remoteErrorType {
 		bool nameserver_not_found = 1;
 		string address_parsing = 2;
-		bytes InvalidAddress = 3;
-		bytes connect_timed_out = 4;
+		std_types.SocketAddr InvalidAddress = 3;
+		std_types.SocketAddr connect_timed_out = 4;
 		BadHttpFilterRegexError bad_http_filter_regex = 5;
 	}
 }

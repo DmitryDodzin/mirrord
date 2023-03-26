@@ -11,34 +11,7 @@ use hyper::{
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{proto, ConnectionId, Port, RemoteResult, RequestId};
-
-fn addr_convert(addr: IpAddr) -> Vec<u8> {
-    match addr {
-        IpAddr::V4(addr) => addr.octets().to_vec(),
-        IpAddr::V6(addr) => addr.octets().to_vec(),
-    }
-}
-
-fn addr_convert_rev(addr: Vec<u8>) -> IpAddr {
-    match addr.len() {
-        4 => {
-            let addr: [u8; 4] = addr
-                .try_into()
-                .expect("couldn't unwrap even though lenght of vec is 4");
-
-            IpAddr::from(addr)
-        }
-        16 => {
-            let addr: [u8; 16] = addr
-                .try_into()
-                .expect("couldn't unwrap even though lenght of vec is 16");
-
-            IpAddr::from(addr)
-        }
-        _ => unimplemented!(),
-    }
-}
+use crate::{ConnectionId, Port, RemoteResult, RequestId};
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct NewTcpConnection {
@@ -47,32 +20,6 @@ pub struct NewTcpConnection {
     pub destination_port: Port,
     pub source_port: Port,
     pub local_address: IpAddr,
-}
-
-impl From<NewTcpConnection> for proto::tcp::NewTcpConnection {
-    fn from(connection: NewTcpConnection) -> Self {
-        proto::tcp::NewTcpConnection {
-            connection_id: connection.connection_id,
-            remote_address: addr_convert(connection.remote_address),
-            destination_port: connection.destination_port.into(),
-            source_port: connection.source_port.into(),
-            local_address: addr_convert(connection.local_address),
-
-            special_fields: Default::default(),
-        }
-    }
-}
-
-impl From<proto::tcp::NewTcpConnection> for NewTcpConnection {
-    fn from(connection: proto::tcp::NewTcpConnection) -> Self {
-        NewTcpConnection {
-            connection_id: connection.connection_id,
-            remote_address: addr_convert_rev(connection.remote_address),
-            destination_port: connection.destination_port as Port,
-            source_port: connection.source_port as Port,
-            local_address: addr_convert_rev(connection.local_address),
-        }
-    }
 }
 
 #[derive(Encode, Decode, PartialEq, Eq, Clone)]
