@@ -32,7 +32,7 @@ impl From<IpAddr> for std::net::IpAddr {
                 let addr: [u8; 4] = addr
                     .inner
                     .try_into()
-                    .expect("couldn't unwrap even though lenght of vec is 4");
+                    .expect("Couldn't unwrap even though lenght of vec is 4");
 
                 std::net::IpAddr::from(addr)
             }
@@ -40,7 +40,7 @@ impl From<IpAddr> for std::net::IpAddr {
                 let addr: [u8; 16] = addr
                     .inner
                     .try_into()
-                    .expect("couldn't unwrap even though lenght of vec is 16");
+                    .expect("Couldn't unwrap even though lenght of vec is 16");
 
                 std::net::IpAddr::from(addr)
             }
