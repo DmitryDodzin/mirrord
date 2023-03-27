@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package protocol.std_types;
+package protocol.net;
 
 message IpAddr {
 	bytes inner = 1;

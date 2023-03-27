@@ -3,14 +3,14 @@ syntax = "proto3";
 package protocol.tcp;
 
 import "error.proto";
-import "std_types.proto";
+import "net.proto";
 
 message NewTcpConnection {
 	uint64 connection_id = 1;
-	std_types.IpAddr remote_address = 2;
+	net.IpAddr remote_address = 2;
 	int32 destination_port = 3;
 	int32 source_port = 4;
-	std_types.IpAddr local_address = 5;
+	net.IpAddr local_address = 5;
 }
 
 message TcpData {

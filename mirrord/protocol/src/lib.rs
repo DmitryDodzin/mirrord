@@ -6,9 +6,9 @@ pub mod codec;
 pub mod dns;
 pub mod error;
 pub mod file;
+pub mod net;
 pub mod outgoing;
 pub mod proto;
-pub mod std_types;
 pub mod tcp;
 pub mod prost {
     pub mod error {
@@ -88,7 +88,7 @@ pub mod prost {
     pub mod tcp {
         include!(concat!(env!("OUT_DIR"), "/protocol.tcp.rs"));
     }
-    pub use super::std_types;
+    pub use super::net;
 }
 
 use std::{collections::HashSet, ops::Deref};

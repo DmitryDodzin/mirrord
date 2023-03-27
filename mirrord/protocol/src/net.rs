@@ -1,4 +1,4 @@
-include!(concat!(env!("OUT_DIR"), "/protocol.std_types.rs"));
+include!(concat!(env!("OUT_DIR"), "/protocol.net.rs"));
 
 impl From<std::net::IpAddr> for IpAddr {
     fn from(addr: std::net::IpAddr) -> Self {
