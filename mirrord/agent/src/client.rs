@@ -8,14 +8,15 @@ use async_trait::async_trait;
 use futures::Stream;
 use mirrord_protocol::{
     api::{agent_server, BincodeMessage, Empty},
-    codec::{ClientMessage, DaemonMessage},
+    codec::{ClientMessage, DaemonMessage, GetEnvVarsRequest},
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio_stream::wrappers::BroadcastStream;
-use tracing::{error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     dns::DnsRequest,
+    env::select_env_vars,
     error::AgentError,
     file::FileManager,
     outgoing::{udp::UdpOutgoingApi, TcpOutgoingApi},
@@ -31,6 +32,7 @@ const CHANNEL_SIZE: usize = 1024;
 pub struct ClientConnection {
     id: ClientId,
     file_manager: Mutex<FileManager>,
+    stream_responce: broadcast::Sender<DaemonMessage>,
     tcp_sniffer_api: Option<Mutex<TcpSnifferApi>>,
     tcp_stealer_api: Mutex<TcpStealerApi>,
     tcp_outgoing_api: TcpOutgoingApi,
@@ -77,9 +79,12 @@ impl ClientConnection {
             TcpStealerApi::new(id, stealer_command_sender, mpsc::channel(CHANNEL_SIZE)).await?,
         );
 
+        let (stream_responce, _) = broadcast::channel(CHANNEL_SIZE);
+
         Ok(ClientConnection {
             id,
             file_manager,
+            stream_responce,
             tcp_sniffer_api,
             tcp_stealer_api,
             tcp_outgoing_api,
@@ -89,7 +94,7 @@ impl ClientConnection {
         })
     }
 
-    async fn respond(&self, message: DaemonMessage) -> Result<()> {
+    async fn respond(&self, _message: DaemonMessage) -> Result<()> {
         Ok(())
     }
 }
@@ -126,47 +131,49 @@ impl agent_server::Agent for ClientConnection {
             //     ClientMessage::UdpOutgoing(layer_message) => {
             //         self.udp_outgoing_api.layer_message(layer_message).await?
             //     }
-            //     ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
-            //         env_vars_filter,
-            //         env_vars_select,
-            //     }) => {
-            //         debug!(
-            //             "ClientMessage::GetEnvVarsRequest client id {:?} filter {:?} select
-            // {:?}",             self.id, env_vars_filter, env_vars_select
-            //         );
+            ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
+                env_vars_filter,
+                env_vars_select,
+            }) => {
+                debug!(
+                    "ClientMessage::GetEnvVarsRequest client id {:?} filter {:?} select {:?}",
+                    self.id, env_vars_filter, env_vars_select
+                );
 
-            //         let env_vars_result =
-            //             env::select_env_vars(&self.env, env_vars_filter, env_vars_select);
+                let env_vars_result = select_env_vars(&self.env, env_vars_filter, env_vars_select);
 
-            //         self.respond(DaemonMessage::GetEnvVarsResponse(env_vars_result))
-            //             .await?
-            //     }
-            // ClientMessage::GetAddrInfoRequest(request) => {
-            //     let (tx, rx) = tokio::sync::oneshot::channel();
-            //     let dns_request = DnsRequest::new(request, tx);
-            //     self.dns_sender.send(dns_request).await?;
+                self.respond(DaemonMessage::GetEnvVarsResponse(env_vars_result))
+                    .await?
+            }
+            ClientMessage::GetAddrInfoRequest(request) => {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                let dns_request = DnsRequest::new(request, tx);
+                self.dns_sender
+                    .send(dns_request)
+                    .await
+                    .map_err(AgentError::from)?;
 
-            //     trace!("waiting for answer from dns thread");
-            //     let response = rx.await?;
+                trace!("waiting for answer from dns thread");
+                let response = rx.await.map_err(AgentError::from)?;
 
-            //     trace!("GetAddrInfoRequest -> response {:#?}", response);
+                trace!("GetAddrInfoRequest -> response {:#?}", response);
 
-            //     self.respond(DaemonMessage::GetAddrInfoResponse(response))
-            //         .await?
-            // }
-            // ClientMessage::Ping => self.respond(DaemonMessage::Pong).await?,
-            // ClientMessage::Tcp(message) => {
-            //     if let Some(sniffer_api) = self.tcp_sniffer_api.as_ref() {
-            //         sniffer_api
-            //             .lock()
-            //             .await
-            //             .handle_client_message(message)
-            //             .await?
-            //     } else {
-            //         warn!("received tcp sniffer request while not available");
-            //         return Err(AgentError::SnifferApiError);
-            //     }
-            // }
+                self.respond(DaemonMessage::GetAddrInfoResponse(response))
+                    .await?
+            }
+            ClientMessage::Ping => self.respond(DaemonMessage::Pong).await?,
+            ClientMessage::Tcp(message) => {
+                if let Some(sniffer_api) = self.tcp_sniffer_api.as_ref() {
+                    sniffer_api
+                        .lock()
+                        .await
+                        .handle_client_message(message)
+                        .await?
+                } else {
+                    warn!("received tcp sniffer request while not available");
+                    return Err(AgentError::SnifferApiError.into());
+                }
+            }
             ClientMessage::TcpSteal(message) => {
                 self.tcp_stealer_api
                     .lock()
@@ -185,7 +192,8 @@ impl agent_server::Agent for ClientConnection {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<Self::DaemonMessageStream>, tonic::Status> {
-        todo!()
+        let stream = BroadcastStream::new(self.stream_responce.subscribe());
+        Ok(tonic::Response::new(DaemonMessageStream(stream)))
     }
 }
 

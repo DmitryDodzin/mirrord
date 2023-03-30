@@ -50,7 +50,7 @@ use tokio::sync::mpsc;
 use tracing::debug;
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 
-use crate::error::Result;
+use crate::{error::Result, util::ClientId};
 
 // use crate::{
 //     cli::Args,
@@ -78,7 +78,23 @@ mod error;
 // mod steal;
 mod util;
 
+mod env {
+    use std::collections::{HashMap, HashSet};
+
+    use mirrord_protocol::ResponseError;
+
+    pub fn select_env_vars(
+        _: &HashMap<String, String>,
+        _: HashSet<String>,
+        _: HashSet<String>,
+    ) -> Result<HashMap<String, String>, ResponseError> {
+        Ok(Default::default())
+    }
+}
+
 mod file {
+    use mirrord_protocol::{FileRequest, FileResponse};
+
     use super::*;
 
     pub struct FileManager;
@@ -88,10 +104,7 @@ mod file {
             FileManager
         }
 
-        pub fn handle_message(
-            &mut self,
-            _message: mirrord_protocol::FileRequest,
-        ) -> Result<Option<mirrord_protocol::FileResponse>> {
+        pub fn handle_message(&mut self, _message: FileRequest) -> Result<Option<FileResponse>> {
             Ok(None)
         }
     }
@@ -120,14 +133,18 @@ mod outgoing {
 }
 
 mod runtime {
+    use std::path::PathBuf;
+
     use super::*;
 
-    pub fn set_namespace(_: std::path::PathBuf) -> Result<()> {
+    pub fn set_namespace(_: PathBuf) -> Result<()> {
         Ok(())
     }
 }
 
 mod sniffer {
+    use mirrord_protocol::tcp::LayerTcp;
+
     use super::*;
 
     pub struct SnifferCommand;
@@ -136,12 +153,16 @@ mod sniffer {
 
     impl TcpSnifferApi {
         pub async fn new(
-            _: crate::util::ClientId,
-            _: tokio::sync::mpsc::Sender<SnifferCommand>,
-            _: tokio::sync::mpsc::Receiver<()>,
-            _: tokio::sync::mpsc::Sender<()>,
+            _: ClientId,
+            _: mpsc::Sender<SnifferCommand>,
+            _: mpsc::Receiver<()>,
+            _: mpsc::Sender<()>,
         ) -> Result<Self> {
             Ok(TcpSnifferApi)
+        }
+
+        pub async fn handle_client_message(&mut self, _message: LayerTcp) -> Result<()> {
+            Ok(())
         }
     }
 }
@@ -152,6 +173,8 @@ mod steal {
     pub struct StealerCommand;
 
     pub mod api {
+        use mirrord_protocol::tcp::LayerTcpSteal;
+
         use super::*;
 
         pub struct TcpStealerApi;
@@ -159,19 +182,13 @@ mod steal {
         impl TcpStealerApi {
             pub async fn new(
                 _: crate::util::ClientId,
-                _: tokio::sync::mpsc::Sender<StealerCommand>,
-                _: (
-                    tokio::sync::mpsc::Sender<()>,
-                    tokio::sync::mpsc::Receiver<()>,
-                ),
+                _: mpsc::Sender<StealerCommand>,
+                _: (mpsc::Sender<()>, mpsc::Receiver<()>),
             ) -> Result<Self> {
                 Ok(TcpStealerApi)
             }
 
-            pub async fn handle_client_message(
-                &mut self,
-                _message: mirrord_protocol::tcp::LayerTcpSteal,
-            ) -> Result<()> {
+            pub async fn handle_client_message(&mut self, _message: LayerTcpSteal) -> Result<()> {
                 Ok(())
             }
         }
