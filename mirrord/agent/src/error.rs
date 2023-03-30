@@ -9,19 +9,18 @@ use mirrord_protocol::{
 };
 use thiserror::Error;
 
-use crate::{sniffer::SnifferCommand, steal::StealerCommand};
+// use crate::{sniffer::SnifferCommand, steal::StealerCommand};
 
 #[derive(Debug, Error)]
 pub enum AgentError {
     #[error("Agent failed with `{0:?}`")]
     IO(#[from] std::io::Error),
 
-    #[error("SnifferCommand sender failed with `{0}`")]
-    SendSnifferCommand(#[from] tokio::sync::mpsc::error::SendError<SnifferCommand>),
+    // #[error("SnifferCommand sender failed with `{0}`")]
+    // SendSnifferCommand(#[from] tokio::sync::mpsc::error::SendError<SnifferCommand>),
 
-    #[error("StealerCommand sender failed with `{0}`")]
-    SendStealerCommand(#[from] tokio::sync::mpsc::error::SendError<StealerCommand>),
-
+    // #[error("StealerCommand sender failed with `{0}`")]
+    // SendStealerCommand(#[from] tokio::sync::mpsc::error::SendError<StealerCommand>),
     #[error("FileRequest sender failed with `{0}`")]
     SendFileRequest(#[from] tokio::sync::mpsc::error::SendError<(u32, FileRequest)>),
 
@@ -31,9 +30,8 @@ pub enum AgentError {
     #[error("DaemonTcp sender failed with `{0}`")]
     SendDaemonTcp(#[from] tokio::sync::mpsc::error::SendError<DaemonTcp>),
 
-    #[error("StealerCommand sender failed with `{0}`")]
-    TrySendStealerCommand(#[from] tokio::sync::mpsc::error::TrySendError<StealerCommand>),
-
+    // #[error("StealerCommand sender failed with `{0}`")]
+    // TrySendStealerCommand(#[from] tokio::sync::mpsc::error::TrySendError<StealerCommand>),
     #[error("ConnectRequest sender failed with `{0}`")]
     SendConnectRequest(#[from] tokio::sync::mpsc::error::SendError<LayerConnect>),
 
@@ -116,9 +114,8 @@ pub enum AgentError {
     #[error("Reading request body failed with `{0}`")]
     HttpRequestSerializationError(#[from] hyper::Error),
 
-    #[error("HTTP filter-stealing error: `{0}`")]
-    HttpFilterError(#[from] crate::steal::http::error::HttpTrafficError),
-
+    // #[error("HTTP filter-stealing error: `{0}`")]
+    // HttpFilterError(#[from] crate::steal::http::error::HttpTrafficError),
     #[error("Failed to encode a an HTTP response with error: `{0}`")]
     HttpEncoding(#[from] hyper::http::Error),
 
@@ -138,6 +135,12 @@ pub enum AgentError {
 
     #[error("Returning an error to test the agent's error cleanup. Should only ever be used when testing mirrord.")]
     TestError,
+}
+
+impl From<AgentError> for tonic::Status {
+    fn from(err: AgentError) -> Self {
+        tonic::Status::from_error(Box::new(err))
+    }
 }
 
 pub(crate) type Result<T, E = AgentError> = std::result::Result<T, E>;

@@ -17,7 +17,7 @@ use containerd_client::{
     with_namespace,
 };
 use enum_dispatch::enum_dispatch;
-use nix::sched::setns;
+// use nix::sched::setns;
 use oci_spec::runtime::Spec;
 use tracing::trace;
 
@@ -279,6 +279,6 @@ pub fn set_namespace(ns_path: PathBuf) -> Result<()> {
     let fd: RawFd = File::open(ns_path)?.into_raw_fd();
     trace!("set_namespace -> fd {:#?}", fd);
 
-    setns(fd, nix::sched::CloneFlags::CLONE_NEWNET)?;
+    // setns(fd, nix::sched::CloneFlags::CLONE_NEWNET)?;
     Ok(())
 }
