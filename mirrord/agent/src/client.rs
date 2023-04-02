@@ -100,7 +100,9 @@ impl ClientConnection {
         })
     }
 
-    async fn respond(&self, _message: DaemonMessage) -> Result<()> {
+    async fn respond(&self, message: DaemonMessage) -> Result<()> {
+        self.stream_responce.send(message)?;
+
         Ok(())
     }
 }
