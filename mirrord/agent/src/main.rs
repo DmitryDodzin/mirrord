@@ -111,6 +111,9 @@ mod file {
 }
 
 mod outgoing {
+    use mirrord_protocol::outgoing::tcp::LayerTcpOutgoing;
+
+    use super::*;
 
     pub struct TcpOutgoingApi;
 
@@ -118,15 +121,27 @@ mod outgoing {
         pub fn new(_: Option<u64>) -> Self {
             TcpOutgoingApi
         }
+
+        pub(crate) async fn layer_message(&mut self, _message: LayerTcpOutgoing) -> Result<()> {
+            Ok(())
+        }
     }
 
     pub mod udp {
+
+        use mirrord_protocol::outgoing::udp::LayerUdpOutgoing;
+
+        use super::*;
 
         pub struct UdpOutgoingApi;
 
         impl UdpOutgoingApi {
             pub fn new(_: Option<u64>) -> Self {
                 UdpOutgoingApi
+            }
+
+            pub async fn layer_message(&mut self, _message: LayerUdpOutgoing) -> Result<()> {
+                Ok(())
             }
         }
     }

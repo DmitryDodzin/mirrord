@@ -12,6 +12,7 @@ use mirrord_protocol::{
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio_stream::wrappers::BroadcastStream;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
@@ -35,10 +36,11 @@ pub struct ClientConnection {
     stream_responce: broadcast::Sender<DaemonMessage>,
     tcp_sniffer_api: Option<Mutex<TcpSnifferApi>>,
     tcp_stealer_api: Mutex<TcpStealerApi>,
-    tcp_outgoing_api: TcpOutgoingApi,
-    udp_outgoing_api: UdpOutgoingApi,
+    tcp_outgoing_api: Mutex<TcpOutgoingApi>,
+    udp_outgoing_api: Mutex<UdpOutgoingApi>,
     dns_sender: mpsc::Sender<DnsRequest>,
     env: HashMap<String, String>,
+    cancellation_token: CancellationToken,
 }
 
 impl ClientConnection {
@@ -51,6 +53,8 @@ impl ClientConnection {
         dns_sender: mpsc::Sender<DnsRequest>,
         env: HashMap<String, String>,
     ) -> Result<Self> {
+        let cancellation_token = CancellationToken::new();
+
         let file_manager = Mutex::new(match pid {
             Some(_) => FileManager::new(pid),
             None if ephemeral => FileManager::new(Some(1)),
@@ -72,16 +76,18 @@ impl ClientConnection {
         })
         .ok();
 
-        let tcp_outgoing_api = TcpOutgoingApi::new(pid);
-        let udp_outgoing_api = UdpOutgoingApi::new(pid);
+        let tcp_outgoing_api = TcpOutgoingApi::new(pid).into();
+        let udp_outgoing_api = UdpOutgoingApi::new(pid).into();
 
-        let tcp_stealer_api = Mutex::new(
-            TcpStealerApi::new(id, stealer_command_sender, mpsc::channel(CHANNEL_SIZE)).await?,
-        );
+        let tcp_stealer_api =
+            TcpStealerApi::new(id, stealer_command_sender, mpsc::channel(CHANNEL_SIZE))
+                .await?
+                .into();
 
         let (stream_responce, _) = broadcast::channel(CHANNEL_SIZE);
 
         Ok(ClientConnection {
+            cancellation_token,
             id,
             file_manager,
             stream_responce,
@@ -125,12 +131,20 @@ impl agent_server::Agent for ClientConnection {
                         .map_err(|err| tonic::Status::from_error(Box::new(err)))?
                 }
             }
-            //     ClientMessage::TcpOutgoing(layer_message) => {
-            //         self.tcp_outgoing_api.layer_message(layer_message).await?
-            //     }
-            //     ClientMessage::UdpOutgoing(layer_message) => {
-            //         self.udp_outgoing_api.layer_message(layer_message).await?
-            //     }
+            ClientMessage::TcpOutgoing(layer_message) => {
+                self.tcp_outgoing_api
+                    .lock()
+                    .await
+                    .layer_message(layer_message)
+                    .await?
+            }
+            ClientMessage::UdpOutgoing(layer_message) => {
+                self.udp_outgoing_api
+                    .lock()
+                    .await
+                    .layer_message(layer_message)
+                    .await?
+            }
             ClientMessage::GetEnvVarsRequest(GetEnvVarsRequest {
                 env_vars_filter,
                 env_vars_select,
@@ -181,8 +195,9 @@ impl agent_server::Agent for ClientConnection {
                     .handle_client_message(message)
                     .await?;
             }
-            ClientMessage::Close => {}
-            _ => todo!(),
+            ClientMessage::Close => {
+                self.cancellation_token.cancel();
+            }
         }
 
         Ok(tonic::Response::new(Empty::default()))
