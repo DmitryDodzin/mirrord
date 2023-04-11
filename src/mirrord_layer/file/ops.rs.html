@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `mirrord/layer/src/file/ops.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ops.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f2fc7b5fd698d27d.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-5f7299aa2b503fb1.css"><link rel="stylesheet" disabled href="../../../static.files/dark-dfb18ef8114bb428.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-4047a6aaddd3789d.css"><script id="default-settings" ></script><script src="../../../static.files/storage-ff4706381ddb2707.js"></script><script defer src="../../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-02cbe07fc548e88c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mirrord_layer/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `mirrord/layer/src/file/ops.rs`."><title>ops.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-fbd14db5c88ed452.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mirrord_layer" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0-nightly (478cbb42b 2023-03-28)" data-search-js="search-bc5a112813b5d712.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" data-theme-light-css="light-db279b6232be9c13.css" data-theme-dark-css="dark-cf923f49f397b216.css" data-theme-ayu-css="ayu-be46fdc453a55015.css" ></div><script src="../../../static.files/storage-d4a1a279bad1a0c0.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-9ade54abd4bd73c8.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mirrord_layer/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -516,6 +516,14 @@
 <a href="#516" id="516">516</a>
 <a href="#517" id="517">517</a>
 <a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
 </pre><pre class="rust"><code><span class="kw">use </span>core::ffi::CStr;
 <span class="kw">use </span>std::{ffi::CString, io::SeekFrom, os::unix::io::RawFd, path::PathBuf};
 
@@ -548,6 +556,52 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(fd: u64, path: String) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ fd, path }
     }
+
+    <span class="doccomment">/// Sends a [`FileOperation::Open`] message, opening the file in the agent.
+    </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>remote_open(
+        path: PathBuf,
+        open_options: OpenOptionsInternal,
+    ) -&gt; Detour&lt;OpenFileResponse&gt; {
+        <span class="kw">let </span>(file_channel_tx, file_channel_rx) = oneshot::channel();
+        <span class="kw">let </span>requesting_file = Open {
+            path,
+            open_options,
+            file_channel_tx,
+        };
+
+        blocking_send_file_message(FileOperation::Open(requesting_file))<span class="question-mark">?</span>;
+
+        Detour::Success(file_channel_rx.blocking_recv()<span class="question-mark">??</span>)
+    }
+
+    <span class="doccomment">/// Sends a [`FileOperation::Read`] message, reading the file in the agent.
+    ///
+    /// Blocking request and wait on already found remote_fd
+    </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>remote_read(remote_fd: u64, read_amount: u64) -&gt; Detour&lt;ReadFileResponse&gt; {
+        <span class="kw">let </span>(file_channel_tx, file_channel_rx) = oneshot::channel();
+
+        <span class="comment">// Limit read size because if we read too much it can lead to a timeout
+        // Seems also that bincode doesn&#39;t do well with large buffers
+        </span><span class="kw">let </span>read_amount = std::cmp::min(read_amount, MAX_READ_SIZE);
+        <span class="kw">let </span>reading_file = Read {
+            remote_fd,
+            buffer_size: read_amount,
+            start_from: <span class="number">0</span>,
+            file_channel_tx,
+        };
+
+        blocking_send_file_message(FileOperation::Read(reading_file))<span class="question-mark">?</span>;
+
+        Detour::Success(file_channel_rx.blocking_recv()<span class="question-mark">??</span>)
+    }
+
+    <span class="doccomment">/// Sends a [`FileOperation::Close`] message, closing the file in the agent.
+    </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>remote_close(fd: u64) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        blocking_send_file_message(FileOperation::Close(Close { fd }))
+    }
 }
 
 <span class="kw">impl </span>Drop <span class="kw">for </span>RemoteFile {
@@ -558,9 +612,7 @@
         // operation to complete. The write operation is hooked and at some point tries to lock
         // `OPEN_FILES`, which means the thread deadlocks with itself (we call
         // `OPEN_FILES.lock()?.remove()` and then while still locked, `OPEN_FILES.lock()` again)
-        </span><span class="kw">let </span>closing_file = Close { fd: <span class="self">self</span>.fd };
-
-        blocking_send_file_message(FileOperation::Close(closing_file)).expect(
+        </span><span class="self">Self</span>::remote_close(<span class="self">self</span>.fd).expect(
             <span class="string">&quot;mirrord failed to send close file message to main layer thread. Error: {err:?}&quot;</span>,
         );
     }
@@ -623,9 +675,7 @@
 </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;error&quot;</span>)]
 </span><span class="kw">fn </span>close_remote_file_on_failure(fd: u64) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="macro">error!</span>(<span class="string">&quot;Call to `libc::shm_open` resulted in an error, closing the file remotely!&quot;</span>);
-
-    blocking_send_file_message(FileOperation::Close(Close { fd }))<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(())
+    RemoteFile::remote_close(fd)
 }
 
 <span class="kw">fn </span>blocking_send_file_message(message: FileOperation) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -654,17 +704,7 @@
 
     <span class="macro">should_ignore!</span>(path, open_options.is_write());
 
-    <span class="kw">let </span>(file_channel_tx, file_channel_rx) = oneshot::channel();
-
-    <span class="kw">let </span>requesting_file = Open {
-        path: path.clone(),
-        open_options,
-        file_channel_tx,
-    };
-
-    blocking_send_file_message(FileOperation::Open(requesting_file))<span class="question-mark">?</span>;
-
-    <span class="kw">let </span>OpenFileResponse { fd: remote_fd } = file_channel_rx.blocking_recv()<span class="question-mark">??</span>;
+    <span class="kw">let </span>OpenFileResponse { fd: remote_fd } = RemoteFile::remote_open(path.clone(), open_options)<span class="question-mark">?</span>;
 
     <span class="comment">// TODO: Need a way to say &quot;open a directory&quot;, right now `is_dir` always returns false.
     // This requires having a fake directory name (`/fake`, for example), instead of just converting
@@ -730,9 +770,7 @@
 
     <span class="kw">let </span>fake_local_dir_name = CString::new(fd.to_string())<span class="question-mark">?</span>;
     <span class="kw">let </span>local_dir_fd = <span class="kw">unsafe </span>{ create_local_fake_file(fake_local_dir_name, remote_dir_fd) }<span class="question-mark">?</span>;
-    OPEN_DIRS
-        .lock()<span class="question-mark">?
-        </span>.insert(local_dir_fd <span class="kw">as </span>usize, remote_dir_fd);
+    OPEN_DIRS.insert(local_dir_fd <span class="kw">as </span>usize, remote_dir_fd);
 
     <span class="comment">// According to docs, when using fdopendir, the fd is now managed by OS - i.e closed
     </span>OPEN_FILES.remove(<span class="kw-2">&amp;</span>fd);
@@ -744,8 +782,7 @@
 </span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>readdir_r(dir_stream: usize) -&gt; Detour&lt;<span class="prelude-ty">Option</span>&lt;DirEntryInternal&gt;&gt; {
     <span class="kw">let </span>remote_fd = <span class="kw-2">*</span>OPEN_DIRS
-        .lock()<span class="question-mark">?
-        </span>.get(<span class="kw-2">&amp;</span>dir_stream)
+        .get(<span class="kw-2">&amp;</span>dir_stream)
         .ok_or(Bypass::LocalDirStreamNotFound(dir_stream))<span class="question-mark">?</span>;
 
     <span class="kw">let </span>(dir_channel_tx, dir_channel_rx) = oneshot::channel();
@@ -764,8 +801,7 @@
 <span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>closedir(dir_stream: usize) -&gt; Detour&lt;c_int&gt; {
     <span class="kw">let </span>remote_fd = <span class="kw-2">*</span>OPEN_DIRS
-        .lock()<span class="question-mark">?
-        </span>.get(<span class="kw-2">&amp;</span>dir_stream)
+        .get(<span class="kw-2">&amp;</span>dir_stream)
         .ok_or(Bypass::LocalDirStreamNotFound(dir_stream))<span class="question-mark">?</span>;
 
     <span class="kw">let </span>requesting_dir = CloseDir { fd: remote_fd };
@@ -821,27 +857,7 @@
 /// **Bypassed** when trying to load system files, and files from the current working directory, see
 /// `open`.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>read(local_fd: RawFd, read_amount: u64) -&gt; Detour&lt;ReadFileResponse&gt; {
-    get_remote_fd(local_fd).and_then(|remote_fd| remote_read(remote_fd, read_amount))
-}
-
-<span class="doccomment">/// Blocking request and wait on already found remote_fd
-</span><span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
-</span><span class="kw">fn </span>remote_read(remote_fd: u64, read_amount: u64) -&gt; Detour&lt;ReadFileResponse&gt; {
-    <span class="kw">let </span>(file_channel_tx, file_channel_rx) = oneshot::channel();
-
-    <span class="comment">// Limit read size because if we read too much it can lead to a timeout
-    // Seems also that bincode doesn&#39;t do well with large buffers
-    </span><span class="kw">let </span>read_amount = std::cmp::min(read_amount, MAX_READ_SIZE);
-    <span class="kw">let </span>reading_file = Read {
-        remote_fd,
-        buffer_size: read_amount,
-        start_from: <span class="number">0</span>,
-        file_channel_tx,
-    };
-
-    blocking_send_file_message(FileOperation::Read(reading_file))<span class="question-mark">?</span>;
-
-    Detour::Success(file_channel_rx.blocking_recv()<span class="question-mark">??</span>)
+    get_remote_fd(local_fd).and_then(|remote_fd| RemoteFile::remote_read(remote_fd, read_amount))
 }
 
 <span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
@@ -1034,5 +1050,4 @@
 
     Detour::Success(dents_rx.blocking_recv()<span class="question-mark">??</span>)
 }
-</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mirrord_layer" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0-nightly (001a77fac 2023-01-30)" data-search-js="search-98d53477a794af0b.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-7c23ac01f615ce90.css" ></div></body></html>
+</code></pre></div></section></main></body></html>
