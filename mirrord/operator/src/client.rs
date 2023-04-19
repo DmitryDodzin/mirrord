@@ -10,7 +10,7 @@ use mirrord_protocol::{ClientMessage, DaemonMessage};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::crd::TargetCrd;
 
@@ -95,15 +95,16 @@ impl OperatorApi {
         &self,
         target: TargetCrd,
     ) -> Result<(mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>)> {
+        let client = self.client.clone();
         let target_path = format!(
             "{}/{}?connect=true",
             self.target_api.resource_url(),
             target.name()
         );
 
-        let creator = move |client: &Client, path: &str| {
+        let creator = move || {
             let client = client.clone();
-            let request = Request::builder().uri(path).body(vec![]);
+            let request = Request::builder().uri(&target_path).body(vec![]);
 
             async move {
                 client
@@ -114,20 +115,22 @@ impl OperatorApi {
             }
         };
 
-        let connection = creator(&self.client, &target_path).await?;
-
-        let (connection, mut wrapper) = ConnectionWrapper::wrap(connection);
-        let client = self.client.clone();
+        let (connection, mut wrapper) = ConnectionWrapper::wrap(creator().await?);
 
         tokio::spawn(async move {
             while let Err(err) = wrapper.start().await {
-                error!("Error connecting to operator {err}");
+                if let OperatorApiError::WsError(TungsteniteError::Io(io_err)) = err {
+                    warn!("Operator communication IOError, reconnecting...");
+                    warn!("{io_err}");
 
-                match creator(&client, &target_path).await {
-                    Ok(new_connection) => wrapper.replace_stream(new_connection),
-                    Err(err) => {
-                        error!("Error reconnecting to operator {err}")
+                    match creator().await {
+                        Ok(new_connection) => wrapper.replace_stream(new_connection),
+                        Err(err) => {
+                            error!("Error reconnecting to operator {err}")
+                        }
                     }
+                } else {
+                    error!("Error connecting to operator {err}");
                 }
             }
         });
