@@ -95,21 +95,44 @@ impl OperatorApi {
         &self,
         target: TargetCrd,
     ) -> Result<(mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>)> {
-        let connection = self
-            .client
-            .connect(
-                Request::builder()
-                    .uri(format!(
-                        "{}/{}?connect=true",
-                        self.target_api.resource_url(),
-                        target.name()
-                    ))
-                    .body(vec![])?,
-            )
-            .await
-            .map_err(KubeApiError::from)?;
+        let target_path = format!(
+            "{}/{}?connect=true",
+            self.target_api.resource_url(),
+            target.name()
+        );
 
-        Ok(ConnectionWrapper::wrap(connection))
+        let creator = move |client: &Client, path: &str| {
+            let client = client.clone();
+            let request = Request::builder().uri(path).body(vec![]);
+
+            async move {
+                client
+                    .connect(request?)
+                    .await
+                    .map_err(KubeApiError::from)
+                    .map_err(OperatorApiError::from)
+            }
+        };
+
+        let connection = creator(&self.client, &target_path).await?;
+
+        let (connection, mut wrapper) = ConnectionWrapper::wrap(connection);
+        let client = self.client.clone();
+
+        tokio::spawn(async move {
+            while let Err(err) = wrapper.start().await {
+                error!("Error connecting to operator {err}");
+
+                match creator(&client, &target_path).await {
+                    Ok(new_connection) => wrapper.replace_stream(new_connection),
+                    Err(err) => {
+                        error!("Error reconnecting to operator {err}")
+                    }
+                }
+            }
+        });
+
+        Ok(connection)
     }
 }
 
@@ -127,7 +150,12 @@ where
         + Unpin
         + 'stream,
 {
-    fn wrap(connection: T) -> (Sender<ClientMessage>, Receiver<DaemonMessage>) {
+    fn wrap(
+        connection: T,
+    ) -> (
+        (Sender<ClientMessage>, Receiver<DaemonMessage>),
+        ConnectionWrapper<T>,
+    ) {
         let (client_tx, client_rx) = mpsc::channel(CONNECTION_CHANNEL_SIZE);
         let (daemon_tx, daemon_rx) = mpsc::channel(CONNECTION_CHANNEL_SIZE);
 
@@ -137,13 +165,11 @@ where
             daemon_tx,
         };
 
-        tokio::spawn(async move {
-            if let Err(err) = connection_wrapper.start().await {
-                error!("{err:?}")
-            }
-        });
+        ((client_tx, daemon_rx), connection_wrapper)
+    }
 
-        (client_tx, daemon_rx)
+    fn replace_stream(&mut self, connection: T) {
+        self.connection = connection;
     }
 
     async fn handle_client_message(&mut self, client_message: ClientMessage) -> Result<()> {
@@ -174,7 +200,7 @@ where
         }
     }
 
-    async fn start(mut self) -> Result<()> {
+    async fn start(&mut self) -> Result<()> {
         loop {
             tokio::select! {
                 client_message = self.client_rx.recv() => {
