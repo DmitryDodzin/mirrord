@@ -39,6 +39,7 @@ pub enum OperatorApiError {
 type Result<T, E = OperatorApiError> = std::result::Result<T, E>;
 
 pub struct OperatorApi {
+    session_id: u64,
     client: Client,
     target_api: Api<TargetCrd>,
     target_config: TargetConfig,
@@ -70,6 +71,7 @@ impl OperatorApi {
             get_k8s_resource_api(&client, target_config.namespace.as_deref());
 
         Ok(OperatorApi {
+            session_id: rand::random(),
             client,
             target_api,
             target_config,
@@ -95,6 +97,7 @@ impl OperatorApi {
         &self,
         target: TargetCrd,
     ) -> Result<(mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>)> {
+        let session_id = self.session_id;
         let client = self.client.clone();
         let target_path = format!(
             "{}/{}?connect=true",
@@ -104,7 +107,10 @@ impl OperatorApi {
 
         let creator = move || {
             let client = client.clone();
-            let request = Request::builder().uri(&target_path).body(vec![]);
+            let request = Request::builder()
+                .uri(&target_path)
+                .header("x-session-id", session_id)
+                .body(vec![]);
 
             async move {
                 client
@@ -120,8 +126,8 @@ impl OperatorApi {
         tokio::spawn(async move {
             while let Err(err) = wrapper.start().await {
                 if let OperatorApiError::WsError(TungsteniteError::Io(io_err)) = err {
-                    warn!("Operator communication IOError, reconnecting...");
-                    warn!("{io_err}");
+                    warn!("Operator communication IOError {io_err}");
+                    warn!("Reconnecting...");
 
                     match creator().await {
                         Ok(new_connection) => wrapper.replace_stream(new_connection),
