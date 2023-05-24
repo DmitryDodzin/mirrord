@@ -12,7 +12,6 @@ use extension::extension_exec;
 use extract::extract_library;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{api::ListParams, Api};
-use mirrord_auth::AuthConfig;
 use mirrord_config::{config::MirrordConfig, LayerConfig, LayerFileConfig};
 use mirrord_kube::{
     api::{container::SKIP_NAMES, get_k8s_resource_api, kubernetes::create_kube_api},
@@ -299,22 +298,6 @@ async fn print_pod_targets(args: &ListTargetArgs) -> Result<()> {
 
     let json_obj = json!(target_vector);
     println!("{json_obj}");
-    Ok(())
-}
-
-fn login(args: LoginArgs) -> Result<()> {
-    match &args.token {
-        Some(token) => AuthConfig::from_input(token)?.save()?,
-        None => {
-            AuthConfig::from_webbrowser(&args.auth_server, args.timeout, args.no_open)?.save()?
-        }
-    }
-
-    println!(
-        "Config succesfuly saved at {}",
-        AuthConfig::config_path().display()
-    );
-
     Ok(())
 }
 

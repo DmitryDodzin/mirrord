@@ -155,8 +155,6 @@ pub(crate) enum CliError {
         r#"Check if you have permissions to write to the file and/or directory exists{GENERAL_HELP}"#
     ))]
     ManifestFileError(std::io::Error),
-    #[error("Authentication issue: `{0:#?}`")]
-    AuthError(#[from] mirrord_auth::AuthenticationError),
     #[cfg(target_os = "macos")]
     #[error("SIP Error: `{0:#?}`")]
     #[diagnostic(help(
