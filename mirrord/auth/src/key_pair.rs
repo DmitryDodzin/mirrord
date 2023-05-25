@@ -22,3 +22,9 @@ impl From<&str> for KeyPair {
         KeyPair(key.to_owned(), Default::default())
     }
 }
+
+impl From<String> for KeyPair {
+    fn from(key: String) -> Self {
+        KeyPair(key, Default::default())
+    }
+}
