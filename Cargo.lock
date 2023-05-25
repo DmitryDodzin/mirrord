@@ -3298,6 +3298,7 @@ version = "3.42.0"
 dependencies = [
  "actix-codec",
  "async-trait",
+ "base64 0.21.0",
  "bincode",
  "bytes",
  "chrono",

@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use futures::{SinkExt, StreamExt};
 use http::request::Request;
 use kube::{error::ErrorResponse, Api, Client};
@@ -111,6 +112,19 @@ impl OperatorApi {
             })
     }
 
+    async fn client_certificate(&self) -> Result<String> {
+        let certificate_der = self
+            .credentials
+            .write()
+            .await
+            .get_or_init::<MirrordOperatorCrd>(&self.client, "default@example.com")
+            .await?
+            .encode_der()
+            .map_err(AuthenticationError::from)?;
+
+        Ok(general_purpose::STANDARD.encode(certificate_der))
+    }
+
     async fn new(config: &LayerConfig) -> Result<Self> {
         let target_config = config.target.clone();
 
@@ -167,14 +181,7 @@ impl OperatorApi {
         &self,
         target: TargetCrd,
     ) -> Result<(mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>)> {
-        let client_credentials = self
-            .credentials
-            .write()
-            .await
-            .get_or_init::<MirrordOperatorCrd>(&self.client, "default@example.com")
-            .await?
-            .encode_der()
-            .map_err(AuthenticationError::from)?;
+        let client_credentials = self.client_certificate().await?;
 
         let connection = self
             .client
