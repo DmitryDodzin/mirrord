@@ -3,9 +3,12 @@
 
 use std::{collections::BTreeMap, fmt::Debug, ops::Deref, path::PathBuf, sync::LazyLock};
 
+pub use bcder;
 use kube::{api::PostParams, Api, Client, Resource};
+pub use pem;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+pub use x509_certificate;
 use x509_certificate::{rfc2986, InMemorySigningKeyPair, KeyAlgorithm, X509CertificateBuilder};
 
 use crate::{certificate::Certificate, key_pair::KeyPair};
