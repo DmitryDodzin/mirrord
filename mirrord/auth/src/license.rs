@@ -66,3 +66,6 @@ impl AsRef<X509Certificate> for License {
         &self.certificate
     }
 }
+
+unsafe impl Send for License {}
+unsafe impl Sync for License {}

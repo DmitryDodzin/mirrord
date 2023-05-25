@@ -1,6 +1,7 @@
 use futures::{SinkExt, StreamExt};
 use http::request::Request;
 use kube::{error::ErrorResponse, Api, Client};
+use mirrord_auth::{AuthenticationError, CredentialStore};
 use mirrord_config::{target::TargetConfig, LayerConfig};
 use mirrord_kube::{
     api::{get_k8s_resource_api, kubernetes::create_kube_api},
@@ -10,7 +11,10 @@ use mirrord_progress::{MessageKind, Progress};
 use mirrord_protocol::{ClientMessage, DaemonMessage};
 use semver::Version;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    RwLock,
+};
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tracing::{error, trace, warn};
 
@@ -37,6 +41,8 @@ pub enum OperatorApiError {
     InvalidMessage(Message),
     #[error("Receiver<DaemonMessage> was dropped")]
     DaemonReceiverDropped,
+    #[error(transparent)]
+    Authentication(#[from] AuthenticationError),
 }
 
 type Result<T, E = OperatorApiError> = std::result::Result<T, E>;
@@ -46,6 +52,7 @@ pub struct OperatorApi {
     target_api: Api<TargetCrd>,
     version_api: Api<MirrordOperatorCrd>,
     target_config: Option<TargetConfig>,
+    credentials: RwLock<CredentialStore>,
 }
 
 impl OperatorApi {
@@ -125,11 +132,14 @@ impl OperatorApi {
 
         let version_api: Api<MirrordOperatorCrd> = Api::all(client.clone());
 
+        let credentials = CredentialStore::load().await.unwrap_or_default().into();
+
         Ok(OperatorApi {
             client,
             target_api,
             version_api,
             target_config,
+            credentials,
         })
     }
 
@@ -157,6 +167,15 @@ impl OperatorApi {
         &self,
         target: TargetCrd,
     ) -> Result<(mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>)> {
+        let client_credentials = self
+            .credentials
+            .write()
+            .await
+            .get_or_init::<MirrordOperatorCrd>(&self.client, "default@example.com")
+            .await?
+            .encode_der()
+            .map_err(AuthenticationError::from)?;
+
         let connection = self
             .client
             .connect(
@@ -167,10 +186,13 @@ impl OperatorApi {
                         target.name()
                     ))
                     .header("x-session-id", Self::session_id())
+                    .header("x-client-der", client_credentials)
                     .body(vec![])?,
             )
             .await
             .map_err(KubeApiError::from)?;
+
+        self.credentials.write().await.save().await?;
 
         Ok(ConnectionWrapper::wrap(connection))
     }

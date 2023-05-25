@@ -346,7 +346,6 @@ async fn main() -> miette::Result<()> {
             extract_library(Some(path), &cli_progress(), false)?;
         }
         Commands::ListTargets(args) => print_pod_targets(&args).await?,
-        Commands::Login(args) => login(args)?,
         Commands::Operator(args) => operator_command(*args).await?,
         Commands::ExtensionExec(args) => extension_exec(*args).await?,
         Commands::InternalProxy(args) => internal_proxy::proxy(*args).await?,

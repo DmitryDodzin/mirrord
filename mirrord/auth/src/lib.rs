@@ -1,8 +1,9 @@
 #![feature(result_option_inspect)]
 #![feature(once_cell)]
 
-use std::{collections::BTreeMap, ops::Deref, path::PathBuf, sync::LazyLock};
+use std::{collections::BTreeMap, fmt::Debug, ops::Deref, path::PathBuf, sync::LazyLock};
 
+use kube::{api::PostParams, Api, Client, Resource};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use x509_certificate::{rfc2986, InMemorySigningKeyPair, KeyAlgorithm, X509CertificateBuilder};
@@ -13,7 +14,9 @@ pub mod certificate;
 pub mod key_pair;
 pub mod license;
 
-type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
+pub type AuthenticationError = Box<dyn std::error::Error + Send + Sync>;
+
+type Result<T, E = AuthenticationError> = std::result::Result<T, E>;
 
 static CREDENTIALS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     home::home_dir()
@@ -56,6 +59,30 @@ impl Credentials {
             .create_certificate_signing_request(self.key_pair.deref())
             .map_err(Box::from)
     }
+
+    pub async fn get_client_certificate<R>(&mut self, client: Client, cn: &str) -> Result<()>
+    where
+        R: Resource + Clone + Debug,
+        R: for<'de> Deserialize<'de>,
+        R::DynamicType: Default,
+    {
+        let certificate_request = self.certificate_request(cn)?.encode_pem()?;
+
+        let api: Api<R> = Api::all(client);
+
+        let certificate: Certificate = api
+            .create_subresource(
+                "certificate",
+                "operator",
+                &PostParams::default(),
+                certificate_request.into(),
+            )
+            .await?;
+
+        self.certificate.replace(certificate);
+
+        Ok(())
+    }
 }
 
 impl Deref for Credentials {
@@ -66,9 +93,19 @@ impl Deref for Credentials {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CredentialStore {
+    active: String,
     client_credentials: BTreeMap<String, Credentials>,
+}
+
+impl Default for CredentialStore {
+    fn default() -> Self {
+        CredentialStore {
+            active: "default".to_string(),
+            client_credentials: BTreeMap::new(),
+        }
+    }
 }
 
 impl CredentialStore {
@@ -86,61 +123,28 @@ impl CredentialStore {
             .map_err(Box::from)
     }
 
-    pub fn get_or_init(&mut self, cluster_name: &str) -> Result<&mut Credentials> {
-        if !self.client_credentials.contains_key(cluster_name) {
+    pub async fn get_or_init<R>(&mut self, client: &Client, cn: &str) -> Result<&mut Credentials>
+    where
+        R: Resource + Clone + Debug,
+        R: for<'de> Deserialize<'de>,
+        R::DynamicType: Default,
+    {
+        if !self.client_credentials.contains_key(&self.active) {
             self.client_credentials
-                .insert(cluster_name.to_owned(), Credentials::init()?);
+                .insert(self.active.clone(), Credentials::init()?);
         }
 
-        self.client_credentials
-            .get_mut(cluster_name)
-            .ok_or_else(|| unreachable!())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use serde_yaml::Value;
-    use x509_certificate::CapturedX509Certificate;
-
-    use super::*;
-    use crate::license::License;
-
-    #[tokio::test]
-    async fn loading() -> Result<()> {
-        let license_file = Value::Mapping(
-            [
-                (
-                    Value::from("certificate"),
-                    Value::from(include_str!("../cert/server.crt")),
-                ),
-                (
-                    Value::from("key_pair"),
-                    Value::from(include_str!("../cert/server.pk8")),
-                ),
-            ]
-            .into_iter()
-            .collect(),
-        );
-        let license: License = serde_yaml::from_value(license_file)?;
-
-        let mut store = CredentialStore::load().await.unwrap_or_default();
-
-        let credentials = store.get_or_init("default")?;
+        let credentials = self
+            .client_credentials
+            .get_mut(&self.active)
+            .expect("Unreachable");
 
         if !credentials.is_ready() {
-            let request = credentials.certificate_request("foobar")?;
-
             credentials
-                .certificate
-                .replace(license.sign_certificate_request(request)?.into());
+                .get_client_certificate::<R>(client.clone(), cn)
+                .await?;
         }
 
-        let cert = CapturedX509Certificate::from_der(credentials.encode_der()?)?;
-
-        license.verify(&cert)?;
-
-        Ok(())
+        Ok(credentials)
     }
 }
