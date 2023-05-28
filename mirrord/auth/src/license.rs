@@ -3,7 +3,8 @@ use std::{path::Path, str::FromStr};
 use base64::{engine::general_purpose, Engine as _};
 use bcder::{encode::Values as _, BitString, Mode};
 use bytes::Bytes;
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use x509_certificate::{
@@ -126,7 +127,7 @@ impl FromStr for License {
 unsafe impl Send for License {}
 unsafe impl Sync for License {}
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct LicenseInfo<'l>(&'l License);
 
 impl<'l> LicenseInfo<'l> {
@@ -145,5 +146,67 @@ impl<'l> LicenseInfo<'l> {
             .filter_map(|org| org.to_string().ok())
             .next()
             .unwrap_or_else(|| "No Organization".to_string())
+    }
+
+    pub fn expire_at(&self) -> NaiveDate {
+        // TODO: Replace with actual
+        Utc::now().date_naive()
+    }
+
+    pub fn to_owned(&self) -> LicenseInfoOwned {
+        LicenseInfoOwned {
+            name: self.name(),
+            organization: self.organization(),
+            expire_at: self.expire_at(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct LicenseInfoOwned {
+    pub name: String,
+    pub organization: String,
+    pub expire_at: NaiveDate,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn from_str() -> Result<()> {
+        let encoded = general_purpose::STANDARD.encode(format!(
+            "{}{}",
+            include_str!("../cert/server.crt"),
+            include_str!("../cert/server.pk8")
+        ));
+
+        let license: License = encoded.parse()?;
+
+        let info = license.info();
+
+        println!(
+            "from_str -> Name: {} Organization: {}",
+            info.name(),
+            info.organization()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn from_paths() -> Result<()> {
+        let license = License::from_paths("./cert/server.crt", "./cert/server.pk8").await?;
+
+        let info = license.info();
+
+        println!(
+            "from_paths -> Name: {} Organization: {}",
+            info.name(),
+            info.organization()
+        );
+
+        Ok(())
     }
 }

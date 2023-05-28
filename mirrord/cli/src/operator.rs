@@ -1,12 +1,12 @@
 use std::{fs::File, path::PathBuf, time::Duration};
 
 use kube::Api;
+use mirrord_auth::prelude::LicenseInfoOwned;
 use mirrord_config::{config::MirrordConfig, LayerFileConfig};
 use mirrord_kube::{api::kubernetes::create_kube_api, error::KubeApiError};
 use mirrord_operator::{
     client::OperatorApiError,
     crd::{MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
-    license::License,
     setup::{Operator, OperatorNamespace, OperatorSetup},
 };
 use mirrord_progress::{Progress, TaskProgress};
@@ -32,19 +32,6 @@ async fn operator_setup(
     }
 
     if let Some(license_key) = license_key {
-        let license = License::fetch_async(license_key.clone())
-            .await
-            .map_err(CliError::LicenseError)?;
-
-        eprintln!(
-            "Installing with license for {} ({})",
-            license.name, license.organization
-        );
-
-        if license.is_expired() {
-            eprintln!("Using an expired license for operator, deployment will not function when installed");
-        }
-
         eprintln!(
             "Intalling mirrord operator with namespace: {}",
             namespace.name()
@@ -104,7 +91,7 @@ async fn operator_status(config: Option<String>) -> Result<()> {
         operator_version,
         default_namespace,
         license:
-            License {
+            LicenseInfoOwned {
                 name,
                 organization,
                 expire_at,

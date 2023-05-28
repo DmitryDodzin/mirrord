@@ -1,9 +1,8 @@
 use kube::CustomResource;
+use mirrord_auth::prelude::LicenseInfoOwned;
 use mirrord_config::target::{Target, TargetConfig};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-use crate::license::License;
 
 pub const TARGETLESS_TARGET_NAME: &str = "targetless";
 
@@ -68,7 +67,7 @@ pub static OPERATOR_STATUS_NAME: &str = "operator";
 pub struct MirrordOperatorSpec {
     pub operator_version: String,
     pub default_namespace: String,
-    pub license: License,
+    pub license: LicenseInfoOwned,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]

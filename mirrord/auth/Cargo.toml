@@ -27,6 +27,7 @@ home = "0.5"
 pem = "2"
 k8s-openapi.workspace = true
 kube.workspace = true
+schemars = { version = "0.8", features = ["chrono"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 tokio = { workspace = true, features = ["fs"] }
