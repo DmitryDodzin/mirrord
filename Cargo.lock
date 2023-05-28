@@ -693,7 +693,7 @@ checksum = "f8175979259124331c1d7bf6586ee7e0da434155e4b2d48ec2c8386281d8df39"
 dependencies = [
  "async-trait",
  "axum-core",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bitflags",
  "bytes",
  "futures-util",
@@ -792,9 +792,9 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+checksum = "3f1e31e207a6b8fb791a38ea3105e6cb541f55e4d029902d3039a4ad07cc4105"
 
 [[package]]
 name = "base64-simd"
@@ -925,7 +925,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af254ed2da4936ef73309e9597180558821cb16ae9bba4cb24ce6b612d8d80ed"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bollard-stubs",
  "bytes",
  "futures-core",
@@ -1188,9 +1188,9 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "console"
-version = "0.15.6"
+version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0525278dce688103060006713371cedbad27186c7d913f33d866b498da0f595"
+checksum = "c926e00cc70edefdc64d3a5ff31cc65bb97a3460097762bd23afb4d8145fccf8"
 dependencies = [
  "encode_unicode 0.3.6",
  "lazy_static",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "fileops"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "libc",
 ]
@@ -2642,7 +2642,7 @@ version = "8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6971da4d9c3aa03c3d8f3ff0f4155b534aad021292003895a469716b2a230378"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "pem",
  "ring",
  "serde",
@@ -2668,7 +2668,7 @@ version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd990069640f9db34b3b0f7a1afc62a05ffaa3be9b66aa3c313f58346df7f788"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes",
  "chrono",
  "http",
@@ -3064,7 +3064,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
  "anyhow",
@@ -3102,7 +3102,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-agent"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
  "async-trait",
@@ -3151,7 +3151,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-auth"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "bcder",
  "bytes",
@@ -3168,7 +3168,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-config"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "bimap",
  "mirrord-config-derive",
@@ -3184,7 +3184,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-config-derive"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -3194,7 +3194,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-console"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "axum",
  "futures",
@@ -3211,10 +3211,10 @@ dependencies = [
 
 [[package]]
 name = "mirrord-kube"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
- "base64 0.21.0",
+ "base64 0.21.1",
  "futures",
  "http-body 0.4.5",
  "hyper 0.14.26",
@@ -3234,11 +3234,11 @@ dependencies = [
 
 [[package]]
 name = "mirrord-layer"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
  "anyhow",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bimap",
  "bytemuck",
  "bytes",
@@ -3285,7 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-layer-macro"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3294,11 +3294,11 @@ dependencies = [
 
 [[package]]
 name = "mirrord-operator"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
  "async-trait",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bincode",
  "bytes",
  "chrono",
@@ -3327,7 +3327,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-progress"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "atty",
  "serde",
@@ -3337,7 +3337,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-protocol"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "actix-codec",
  "bincode",
@@ -3357,7 +3357,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-sip"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "apple-codesign",
  "memchr",
@@ -3685,7 +3685,7 @@ dependencies = [
 
 [[package]]
 name = "outgoing"
-version = "3.42.0"
+version = "3.44.1"
 
 [[package]]
 name = "outref"
@@ -3873,7 +3873,7 @@ version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9bd9647b268a3d3e14ff09c23201133a62589c658db02bb7388c7246aafe0590"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "indexmap",
  "line-wrap",
  "quick-xml",
@@ -4360,7 +4360,7 @@ version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -4467,21 +4467,21 @@ dependencies = [
 
 [[package]]
 name = "rust-bypassed-unix-socket"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "rust-e2e-fileops"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "rust-unix-socket-client"
-version = "3.42.0"
+version = "3.44.1"
 dependencies = [
  "tokio",
 ]
@@ -4572,7 +4572,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.1",
 ]
 
 [[package]]
@@ -5562,7 +5562,7 @@ checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-trait",
  "axum",
- "base64 0.21.0",
+ "base64 0.21.1",
  "bytes",
  "futures-core",
  "futures-util",
