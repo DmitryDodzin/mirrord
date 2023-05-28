@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use chrono::{NaiveDate, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -5,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "license-fetch")]
 static LICENSE_SERVER: &str = "https://license.metalbear.co/v1/check";
 
+#[deprecated]
 #[derive(Clone, Debug, Hash, Deserialize, JsonSchema, Serialize)]
 pub struct License {
     pub organization: String,
@@ -53,6 +56,7 @@ pub struct LicenseCheckRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LicenseCheckResponse(License);
 
+#[allow(deprecated)]
 impl From<LicenseCheckResponse> for License {
     fn from(val: LicenseCheckResponse) -> Self {
         val.0
