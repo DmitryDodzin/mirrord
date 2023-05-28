@@ -1,6 +1,5 @@
 use std::{path::Path, str::FromStr};
 
-use base64::{engine::general_purpose, Engine as _};
 use bcder::{encode::Values as _, BitString, Mode};
 use bytes::Bytes;
 use chrono::{Duration, NaiveDate, Utc};
@@ -97,13 +96,11 @@ impl AsRef<X509Certificate> for License {
 impl FromStr for License {
     type Err = AuthenticationError;
 
-    fn from_str(encoded: &str) -> Result<Self, Self::Err> {
-        let decoded = general_purpose::STANDARD.decode(encoded)?;
-
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let mut certificate = None;
         let mut key_pair = None;
 
-        for pem in pem::parse_many(decoded)? {
+        for pem in pem::parse_many(value)? {
             match pem.tag() {
                 "CERTIFICATE" => {
                     let x509 = X509Certificate::from_der(pem.contents())?;
@@ -176,11 +173,11 @@ mod tests {
 
     #[test]
     fn from_str() -> Result<()> {
-        let encoded = general_purpose::STANDARD.encode(format!(
+        let encoded = format!(
             "{}{}",
             include_str!("../cert/server.crt"),
             include_str!("../cert/server.pk8")
-        ));
+        );
 
         let license: License = encoded.parse()?;
 
