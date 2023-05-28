@@ -143,7 +143,7 @@ dependencies = [
  "env_logger",
  "jsonwebtoken",
  "log",
- "pem",
+ "pem 1.1.1",
  "rand",
  "reqwest",
  "rsa",
@@ -204,7 +204,7 @@ dependencies = [
  "once_cell",
  "p12",
  "p256",
- "pem",
+ "pem 1.1.1",
  "pkcs1",
  "pkcs8",
  "plist",
@@ -1383,7 +1383,7 @@ dependencies = [
  "bytes",
  "chrono",
  "hex",
- "pem",
+ "pem 1.1.1",
  "reqwest",
  "ring",
  "signature 1.6.4",
@@ -2643,7 +2643,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6971da4d9c3aa03c3d8f3ff0f4155b534aad021292003895a469716b2a230378"
 dependencies = [
  "base64 0.21.1",
- "pem",
+ "pem 1.1.1",
  "ring",
  "serde",
  "serde_json",
@@ -2727,7 +2727,7 @@ dependencies = [
  "jsonpath_lib",
  "k8s-openapi",
  "kube-core",
- "pem",
+ "pem 1.1.1",
  "pin-project",
  "rand",
  "rustls 0.21.1",
@@ -3153,13 +3153,14 @@ dependencies = [
 name = "mirrord-auth"
 version = "3.44.1"
 dependencies = [
+ "base64 0.21.1",
  "bcder",
  "bytes",
  "chrono",
  "home",
  "k8s-openapi",
  "kube",
- "pem",
+ "pem 2.0.1",
  "serde",
  "serde_yaml",
  "tokio",
@@ -3777,6 +3778,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b13fe415cdf3c8e44518e18a7c95a13431d9bdf6d15367d82b23c377fdd441a"
+dependencies = [
+ "base64 0.21.1",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4286,7 +4297,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffbe84efe2f38dea12e9bfc1f65377fdf03e53a18cb3b995faedf7934c7e785b"
 dependencies = [
- "pem",
+ "pem 1.1.1",
  "ring",
  "time 0.3.21",
  "x509-parser",
@@ -6362,7 +6373,7 @@ dependencies = [
  "chrono",
  "der 0.6.1",
  "hex",
- "pem",
+ "pem 1.1.1",
  "ring",
  "signature 1.6.4",
  "spki 0.6.0",
@@ -6380,7 +6391,7 @@ dependencies = [
  "chrono",
  "der 0.7.6",
  "hex",
- "pem",
+ "pem 1.1.1",
  "ring",
  "signature 2.1.0",
  "spki 0.7.2",

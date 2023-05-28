@@ -19,11 +19,12 @@ edition.workspace = true
 default = []
 
 [dependencies]
+base64 = "0.21"
 bcder = "0.7"
 bytes = "1"
 chrono = "0.4"
 home = "0.5"
-pem = "1"
+pem = "2"
 k8s-openapi.workspace = true
 kube.workspace = true
 serde = { version = "1", features = ["derive"] }

@@ -2,7 +2,7 @@ use base64::{engine::general_purpose, Engine as _};
 use futures::{SinkExt, StreamExt};
 use http::request::Request;
 use kube::{error::ErrorResponse, Api, Client};
-use mirrord_auth::{AuthenticationError, CredentialStore};
+use mirrord_auth::prelude::{AuthenticationError, CredentialStore};
 use mirrord_config::{target::TargetConfig, LayerConfig};
 use mirrord_kube::{
     api::{get_k8s_resource_api, kubernetes::create_kube_api},
@@ -119,6 +119,7 @@ impl OperatorApi {
             .await
             .get_or_init::<MirrordOperatorCrd>(&self.client, "default@example.com")
             .await?
+            .as_ref()
             .encode_der()
             .map_err(AuthenticationError::from)?;
 

@@ -1,15 +1,21 @@
+use std::{path::Path, str::FromStr};
+
+use base64::{engine::general_purpose, Engine as _};
 use bcder::{encode::Values as _, BitString, Mode};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 use x509_certificate::{
     asn1time::Time, rfc2986, rfc5280, CapturedX509Certificate, Sign as _, Signer as _,
-    X509Certificate, X509CertificateError,
+    X509Certificate,
 };
 
-use crate::{certificate::Certificate, key_pair::KeyPair};
-
-type Result<T, E = X509CertificateError> = std::result::Result<T, E>;
+use crate::{
+    certificate::Certificate,
+    error::{AuthenticationError, Result},
+    key_pair::KeyPair,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct License {
@@ -18,6 +24,20 @@ pub struct License {
 }
 
 impl License {
+    pub async fn from_paths<C, K>(certificate_path: C, key_pair_path: K) -> Result<Self>
+    where
+        C: AsRef<Path>,
+        K: AsRef<Path>,
+    {
+        let certificate = fs::read_to_string(certificate_path).await?.parse()?;
+        let key_pair = fs::read_to_string(key_pair_path).await?.into();
+
+        Ok(License {
+            certificate,
+            key_pair,
+        })
+    }
+
     pub fn sign_certificate_request(
         &self,
         request: rfc2986::CertificationRequest,
@@ -57,7 +77,9 @@ impl License {
     }
 
     pub fn verify(&self, certificate: &CapturedX509Certificate) -> Result<()> {
-        certificate.verify_signed_by_certificate(self)
+        certificate
+            .verify_signed_by_certificate(self)
+            .map_err(AuthenticationError::from)
     }
 
     pub fn info(&self) -> LicenseInfo<'_> {
@@ -68,6 +90,36 @@ impl License {
 impl AsRef<X509Certificate> for License {
     fn as_ref(&self) -> &X509Certificate {
         &self.certificate
+    }
+}
+
+impl FromStr for License {
+    type Err = AuthenticationError;
+
+    fn from_str(encoded: &str) -> Result<Self, Self::Err> {
+        let decoded = general_purpose::STANDARD.decode(encoded)?;
+
+        let mut certificate = None;
+        let mut key_pair = None;
+
+        for pem in pem::parse_many(decoded)? {
+            match pem.tag() {
+                "CERTIFICATE" => {
+                    let x509 = X509Certificate::from_der(pem.contents())?;
+                    certificate = Some(Certificate::from(x509));
+                }
+                "PRIVATE KEY" => key_pair = Some(KeyPair::from(pem::encode(&pem))),
+                _ => {}
+            }
+        }
+
+        match (certificate, key_pair) {
+            (Some(certificate), Some(key_pair)) => Ok(License {
+                certificate,
+                key_pair,
+            }),
+            _ => todo!("Missing certificates"),
+        }
     }
 }
 
@@ -82,7 +134,7 @@ impl<'l> LicenseInfo<'l> {
         self.0
             .certificate
             .subject_common_name()
-            .expect("Invalid License Certificate")
+            .unwrap_or_else(|| "No Name".to_string())
     }
 
     pub fn organization(&self) -> String {
@@ -92,6 +144,6 @@ impl<'l> LicenseInfo<'l> {
             .iter_organization()
             .filter_map(|org| org.to_string().ok())
             .next()
-            .expect("Invalid License Certificate")
+            .unwrap_or_else(|| "No Organization".to_string())
     }
 }
