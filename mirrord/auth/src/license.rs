@@ -59,6 +59,10 @@ impl License {
     pub fn verify(&self, certificate: &CapturedX509Certificate) -> Result<()> {
         certificate.verify_signed_by_certificate(self)
     }
+
+    pub fn info(&self) -> LicenseInfo<'_> {
+        LicenseInfo(self)
+    }
 }
 
 impl AsRef<X509Certificate> for License {
@@ -69,3 +73,25 @@ impl AsRef<X509Certificate> for License {
 
 unsafe impl Send for License {}
 unsafe impl Sync for License {}
+
+#[derive(Debug)]
+pub struct LicenseInfo<'l>(&'l License);
+
+impl<'l> LicenseInfo<'l> {
+    pub fn name(&self) -> String {
+        self.0
+            .certificate
+            .subject_common_name()
+            .expect("Invalid License Certificate")
+    }
+
+    pub fn organization(&self) -> String {
+        self.0
+            .certificate
+            .subject_name()
+            .iter_organization()
+            .filter_map(|org| org.to_string().ok())
+            .next()
+            .expect("Invalid License Certificate")
+    }
+}
