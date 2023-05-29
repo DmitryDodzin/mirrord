@@ -1,4 +1,8 @@
-use std::{path::Path, str::FromStr};
+use std::{
+    hash::{Hash, Hasher},
+    path::Path,
+    str::FromStr,
+};
 
 use bcder::{encode::Values as _, BitString, Mode};
 use bytes::Bytes;
@@ -90,6 +94,17 @@ impl License {
 impl AsRef<X509Certificate> for License {
     fn as_ref(&self) -> &X509Certificate {
         &self.certificate
+    }
+}
+
+impl Hash for License {
+    fn hash<H>(&self, hasher: &mut H)
+    where
+        H: Hasher,
+    {
+        if let Ok(sh256) = self.certificate.sha256_fingerprint() {
+            hasher.write(sh256.as_ref())
+        }
     }
 }
 
