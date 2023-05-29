@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     hash::{Hash, Hasher},
     path::Path,
     str::FromStr,
@@ -6,7 +7,7 @@ use std::{
 
 use bcder::{encode::Values as _, BitString, Mode};
 use bytes::Bytes;
-use chrono::{Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
@@ -28,20 +29,6 @@ pub struct License {
 }
 
 impl License {
-    pub async fn from_paths<C, K>(certificate_path: C, key_pair_path: K) -> Result<Self>
-    where
-        C: AsRef<Path>,
-        K: AsRef<Path>,
-    {
-        let certificate = fs::read_to_string(certificate_path).await?.parse()?;
-        let key_pair = fs::read_to_string(key_pair_path).await?.into();
-
-        Ok(License {
-            certificate,
-            key_pair,
-        })
-    }
-
     pub fn sign_certificate_request(
         &self,
         request: rfc2986::CertificationRequest,
@@ -139,7 +126,7 @@ impl FromStr for License {
 unsafe impl Send for License {}
 unsafe impl Sync for License {}
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct LicenseInfo<'l>(&'l License);
 
 impl<'l> LicenseInfo<'l> {
@@ -161,8 +148,13 @@ impl<'l> LicenseInfo<'l> {
     }
 
     pub fn expire_at(&self) -> NaiveDate {
-        // TODO: Replace with actual
-        Utc::now().date_naive()
+        self.0
+            .certificate
+            .as_ref()
+            .tbs_certificate
+            .validity
+            .not_after
+            .date_naive()
     }
 
     pub fn to_owned(&self) -> LicenseInfoOwned {
@@ -174,6 +166,16 @@ impl<'l> LicenseInfo<'l> {
     }
 }
 
+impl fmt::Debug for LicenseInfo<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LicenseInfo")
+            .field("name", &self.name())
+            .field("organization", &self.organization())
+            .field("expire_at", &self.expire_at())
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct LicenseInfoOwned {
     pub name: String,
@@ -181,44 +183,15 @@ pub struct LicenseInfoOwned {
     pub expire_at: NaiveDate,
 }
 
-#[cfg(test)]
-mod tests {
+pub trait TimeExt {
+    fn date_naive(&self) -> NaiveDate;
+}
 
-    use super::*;
-
-    #[test]
-    fn from_str() -> Result<()> {
-        let encoded = format!(
-            "{}{}",
-            include_str!("../cert/server.crt"),
-            include_str!("../cert/server.pk8")
-        );
-
-        let license: License = encoded.parse()?;
-
-        let info = license.info();
-
-        println!(
-            "from_str -> Name: {} Organization: {}",
-            info.name(),
-            info.organization()
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn from_paths() -> Result<()> {
-        let license = License::from_paths("./cert/server.crt", "./cert/server.pk8").await?;
-
-        let info = license.info();
-
-        println!(
-            "from_paths -> Name: {} Organization: {}",
-            info.name(),
-            info.organization()
-        );
-
-        Ok(())
+impl TimeExt for Time {
+    fn date_naive(&self) -> NaiveDate {
+        match self {
+            Time::UtcTime(time) => time.date_naive(),
+            Time::GeneralTime(time) => DateTime::<Utc>::from(time.clone()).date_naive(),
+        }
     }
 }
