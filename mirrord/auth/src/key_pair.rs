@@ -1,11 +1,11 @@
-use std::{cell::OnceCell, ops::Deref};
+use std::{ops::Deref, sync::OnceLock};
 
 use serde::{Deserialize, Serialize};
 use x509_certificate::InMemorySigningKeyPair;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct KeyPair(String, #[serde(skip)] OnceCell<InMemorySigningKeyPair>);
+pub struct KeyPair(String, #[serde(skip)] OnceLock<InMemorySigningKeyPair>);
 
 impl Deref for KeyPair {
     type Target = InMemorySigningKeyPair;
