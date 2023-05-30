@@ -3164,6 +3164,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_yaml",
+ "thiserror",
  "tokio",
  "x509-certificate 0.19.0",
 ]

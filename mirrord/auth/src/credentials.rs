@@ -3,9 +3,15 @@ use std::{fmt::Debug, ops::Deref};
 use kube::{api::PostParams, Api, Client, Resource};
 use serde::{Deserialize, Serialize};
 pub use x509_certificate;
-use x509_certificate::{rfc2986, InMemorySigningKeyPair, KeyAlgorithm, X509CertificateBuilder};
+use x509_certificate::{
+    rfc2986, InMemorySigningKeyPair, KeyAlgorithm, X509CertificateBuilder, X509CertificateError,
+};
 
-use crate::{certificate::Certificate, error::Result, key_pair::KeyPair};
+use crate::{
+    certificate::Certificate,
+    error::{AuthenticationError, Result},
+    key_pair::KeyPair,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {
@@ -37,7 +43,7 @@ impl Credentials {
 
         builder
             .create_certificate_signing_request(self.key_pair.deref())
-            .map_err(Box::from)
+            .map_err(AuthenticationError::from)
     }
 
     pub async fn get_client_certificate<R>(&mut self, client: Client, cn: &str) -> Result<()>
@@ -46,7 +52,10 @@ impl Credentials {
         R: for<'de> Deserialize<'de>,
         R::DynamicType: Default,
     {
-        let certificate_request = self.certificate_request(cn)?.encode_pem()?;
+        let certificate_request = self
+            .certificate_request(cn)?
+            .encode_pem()
+            .map_err(X509CertificateError::from)?;
 
         let api: Api<R> = Api::all(client);
 

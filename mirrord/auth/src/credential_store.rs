@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 pub use x509_certificate;
 
-use crate::{credentials::Credentials, error::Result};
+use crate::{
+    credentials::Credentials,
+    error::{AuthenticationError, CertificateStoreError, Result},
+};
 
 static CREDENTIALS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     home::home_dir()
@@ -32,17 +35,22 @@ impl Default for CredentialStore {
 
 impl CredentialStore {
     pub async fn load() -> Result<Self> {
-        let buffer = fs::read(&*CREDENTIALS_PATH).await?;
+        let buffer = fs::read(&*CREDENTIALS_PATH)
+            .await
+            .map_err(CertificateStoreError::from)?;
 
-        serde_yaml::from_slice(&buffer).map_err(Box::from)
+        serde_yaml::from_slice(&buffer)
+            .map_err(CertificateStoreError::from)
+            .map_err(AuthenticationError::from)
     }
 
     pub async fn save(&self) -> Result<()> {
-        let buffer = serde_yaml::to_string(&self)?;
+        let buffer = serde_yaml::to_string(&self).map_err(CertificateStoreError::from)?;
 
         fs::write(&*CREDENTIALS_PATH, &buffer)
             .await
-            .map_err(Box::from)
+            .map_err(CertificateStoreError::from)
+            .map_err(AuthenticationError::from)
     }
 
     pub async fn get_or_init<R>(&mut self, client: &Client, cn: &str) -> Result<&mut Credentials>

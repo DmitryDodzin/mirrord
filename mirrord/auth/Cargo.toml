@@ -30,4 +30,5 @@ schemars = { version = "0.8", features = ["chrono"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 tokio = { workspace = true, features = ["fs"] }
+thiserror = "1"
 x509-certificate = "0.19"
