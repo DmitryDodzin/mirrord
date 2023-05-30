@@ -121,7 +121,7 @@ impl OperatorApi {
             .await?
             .as_ref()
             .encode_der()
-            .map_err(AuthenticationError::from)?;
+            .map_err(|err| AuthenticationError::X509Certificate(err.into()))?;
 
         Ok(general_purpose::STANDARD.encode(certificate_der))
     }

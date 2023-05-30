@@ -1,12 +1,11 @@
 use std::{fs::File, path::PathBuf, time::Duration};
 
 use kube::Api;
-use mirrord_auth::prelude::LicenseInfoOwned;
 use mirrord_config::{config::MirrordConfig, LayerFileConfig};
 use mirrord_kube::{api::kubernetes::create_kube_api, error::KubeApiError};
 use mirrord_operator::{
     client::OperatorApiError,
-    crd::{MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
+    crd::{LicenseInfoOwned, MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
     setup::{Operator, OperatorNamespace, OperatorSetup},
 };
 use mirrord_progress::{Progress, TaskProgress};
