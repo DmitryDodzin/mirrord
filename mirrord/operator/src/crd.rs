@@ -1,5 +1,5 @@
+use chrono::NaiveDate;
 use kube::CustomResource;
-use mirrord_auth::prelude::LicenseInfoOwned;
 use mirrord_config::target::{Target, TargetConfig};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
