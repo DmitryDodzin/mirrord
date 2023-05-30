@@ -82,3 +82,10 @@ pub struct Session {
     pub user: String,
     pub target: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct LicenseInfoOwned {
+    pub name: String,
+    pub organization: String,
+    pub expire_at: NaiveDate,
+}

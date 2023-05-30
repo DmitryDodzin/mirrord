@@ -1,6 +1,3 @@
 pub use crate::{
-    credential_store::CredentialStore,
-    credentials::Credentials,
-    error::AuthenticationError,
-    license::{License, LicenseInfoOwned},
+    credential_store::CredentialStore, credentials::Credentials, error::AuthenticationError,
 };
