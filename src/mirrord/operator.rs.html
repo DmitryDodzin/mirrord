@@ -156,6 +156,8 @@
 <a href="#156" id="156">156</a>
 <a href="#157" id="157">157</a>
 <a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{fs::File, path::PathBuf, time::Duration};
 
 <span class="kw">use </span>kube::Api;
@@ -163,12 +165,13 @@
 <span class="kw">use </span>mirrord_kube::{api::kubernetes::create_kube_api, error::KubeApiError};
 <span class="kw">use </span>mirrord_operator::{
     client::OperatorApiError,
-    crd::{MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
-    license::License,
+    crd::{LicenseInfoOwned, MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
     setup::{Operator, OperatorNamespace, OperatorSetup},
 };
 <span class="kw">use </span>mirrord_progress::{Progress, TaskProgress};
 <span class="kw">use </span>prettytable::{row, Table};
+<span class="kw">use </span>tokio::fs;
+<span class="kw">use </span>tracing::warn;
 
 <span class="kw">use crate</span>::{
     config::{OperatorArgs, OperatorCommand},
@@ -181,7 +184,7 @@
     accept_tos: bool,
     file: <span class="prelude-ty">Option</span>&lt;PathBuf&gt;,
     namespace: OperatorNamespace,
-    license_key: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    license: <span class="prelude-ty">Option</span>&lt;String&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">if </span>!accept_tos {
         <span class="macro">eprintln!</span>(<span class="string">&quot;Please note that mirrord operator installation requires an active subscription for the mirrord Operator provided by MetalBear Tech LTD.\nThe service ToS can be read here - https://metalbear.co/legal/terms\nPass --accept-tos to accept the TOS&quot;</span>);
@@ -189,26 +192,13 @@
         <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(license_key) = license_key {
-        <span class="kw">let </span>license = License::fetch_async(license_key.clone())
-            .<span class="kw">await
-            </span>.map_err(CliError::LicenseError)<span class="question-mark">?</span>;
-
-        <span class="macro">eprintln!</span>(
-            <span class="string">&quot;Installing with license for {} ({})&quot;</span>,
-            license.name, license.organization
-        );
-
-        <span class="kw">if </span>license.is_expired() {
-            <span class="macro">eprintln!</span>(<span class="string">&quot;Using an expired license for operator, deployment will not function when installed&quot;</span>);
-        }
-
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(license) = license {
         <span class="macro">eprintln!</span>(
             <span class="string">&quot;Intalling mirrord operator with namespace: {}&quot;</span>,
             namespace.name()
         );
 
-        <span class="kw">let </span>operator = Operator::new(license_key, namespace);
+        <span class="kw">let </span>operator = Operator::new(license, namespace);
 
         <span class="kw">match </span>file {
             <span class="prelude-val">Some</span>(path) =&gt; {
@@ -217,7 +207,7 @@
             <span class="prelude-val">None </span>=&gt; operator.to_writer(std::io::stdout()).unwrap(), <span class="comment">/* unwrap because failing to write to std out.. well.. */
         </span>}
     } <span class="kw">else </span>{
-        <span class="macro">eprintln!</span>(<span class="string">&quot;--license-key is required to install on cluster&quot;</span>);
+        <span class="macro">eprintln!</span>(<span class="string">&quot;--license-key or --license-path is required to install on cluster&quot;</span>);
     }
 
     <span class="prelude-val">Ok</span>(())
@@ -237,7 +227,7 @@
 
     <span class="kw">let </span>status_api: Api&lt;MirrordOperatorCrd&gt; = Api::all(kube_api);
 
-    <span class="kw">let </span>status_progress = progress.subtask(<span class="string">&quot;Fetching Status&quot;</span>);
+    <span class="kw">let </span>status_progress = progress.subtask(<span class="string">&quot;fetching status&quot;</span>);
 
     <span class="kw">let </span>mirrord_status = <span class="kw">match </span>status_api
         .get(OPERATOR_STATUS_NAME)
@@ -248,13 +238,13 @@
     {
         <span class="prelude-val">Ok</span>(status) =&gt; status,
         <span class="prelude-val">Err</span>(err) =&gt; {
-            status_progress.fail_with(<span class="string">&quot;Unable to get Status&quot;</span>);
+            status_progress.fail_with(<span class="string">&quot;unable to get status&quot;</span>);
 
             <span class="kw">return </span><span class="prelude-val">Err</span>(err);
         }
     };
 
-    status_progress.done_with(<span class="string">&quot;Fetched Status&quot;</span>);
+    status_progress.done_with(<span class="string">&quot;fetched status&quot;</span>);
 
     progress.done();
 
@@ -262,10 +252,11 @@
         operator_version,
         default_namespace,
         license:
-            License {
+            LicenseInfoOwned {
                 name,
                 organization,
                 expire_at,
+                ..
             },
     } = mirrord_status.spec;
 
@@ -310,7 +301,20 @@ Operator License
             file,
             namespace,
             license_key,
-        } =&gt; operator_setup(accept_tos, file, namespace, license_key).<span class="kw">await</span>,
+            license_path,
+        } =&gt; {
+            <span class="kw">let </span>license = <span class="kw">match </span>license_path {
+                <span class="prelude-val">Some</span>(path) =&gt; fs::read_to_string(<span class="kw-2">&amp;</span>path)
+                    .<span class="kw">await
+                    </span>.inspect_err(|err| {
+                        <span class="macro">warn!</span>(<span class="string">&quot;Unable to read license at path {}: {err}&quot;</span>, path.display())
+                    })
+                    .ok(),
+                <span class="prelude-val">None </span>=&gt; license_key,
+            };
+
+            operator_setup(accept_tos, file, namespace, license).<span class="kw">await
+        </span>}
         OperatorCommand::Status { config_file } =&gt; operator_status(config_file).<span class="kw">await</span>,
     }
 }

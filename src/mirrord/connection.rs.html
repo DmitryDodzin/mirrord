@@ -108,7 +108,7 @@
 <span class="kw">use </span>mirrord_progress::Progress;
 <span class="kw">use </span>mirrord_protocol::{ClientMessage, DaemonMessage};
 <span class="kw">use </span>tokio::sync::mpsc;
-<span class="kw">use </span>tracing::warn;
+<span class="kw">use </span>tracing::trace;
 
 <span class="kw">use crate</span>::{CliError, <span class="prelude-ty">Result</span>};
 
@@ -131,7 +131,7 @@
 <span class="kw">where
     </span>P: Progress + Send + Sync,
 {
-    <span class="kw">let </span>sub_progress = progress.subtask(<span class="string">&quot;Checking Operator&quot;</span>);
+    <span class="kw">let </span>sub_progress = progress.subtask(<span class="string">&quot;checking operator&quot;</span>);
 
     <span class="kw">match </span>OperatorApi::discover(config, progress)
         .<span class="kw">await
@@ -139,19 +139,19 @@
         .into_diagnostic()
     {
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(connection)) =&gt; {
-            sub_progress.done_with(<span class="string">&quot;Connected to Operator&quot;</span>);
+            sub_progress.done_with(<span class="string">&quot;connected to operator&quot;</span>);
 
             <span class="prelude-val">Some</span>(connection)
         }
         <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; {
-            sub_progress.done_with(<span class="string">&quot;No Operator Detected&quot;</span>);
+            sub_progress.done_with(<span class="string">&quot;no operator detected&quot;</span>);
 
             <span class="prelude-val">None
         </span>}
         <span class="prelude-val">Err</span>(err) =&gt; {
-            sub_progress.fail_with(<span class="string">&quot;Unable to connect to Operator&quot;</span>);
+            sub_progress.done_with(<span class="string">&quot;unable to check if operator exists, probably due to RBAC&quot;</span>);
 
-            <span class="macro">warn!</span>(<span class="string">&quot;{err}&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;{err}&quot;</span>);
 
             <span class="prelude-val">None
         </span>}
@@ -172,7 +172,7 @@
             AgentConnection { sender, receiver },
         ))
     } <span class="kw">else </span>{
-        <span class="kw">if </span><span class="macro">matches!</span>(config.target.path, <span class="prelude-val">Some</span>(mirrord_config::target::Target::Deployment{..})) {
+        <span class="kw">if </span><span class="macro">matches!</span>(config.target, mirrord_config::target::TargetConfig{ path: <span class="prelude-val">Some</span>(mirrord_config::target::Target::Deployment{..}), ..}) {
             <span class="comment">// progress.subtask(&quot;text&quot;).done_with(&quot;text&quot;);
             </span><span class="macro">eprintln!</span>(<span class="string">&quot;When targeting multi-pod deployments, mirrord impersonates the first pod in the deployment.\n \
                       Support for multi-pod impersonation requires the mirrord operator, which is part of mirrord for Teams.\n \

@@ -6,8 +6,8 @@ You can configure the serialization format between integers, floats, and stringi
 <a href="formats/struct.Strict.html" title="struct serde_with::formats::Strict"><code>formats::Strict</code></a> means that deserialization only supports the type given in <code>FORMAT</code>, e.g., if <code>FORMAT</code> is <code>u64</code> deserialization from a <code>f64</code> will error.
 <a href="formats/struct.Flexible.html" title="struct serde_with::formats::Flexible"><code>formats::Flexible</code></a> means that deserialization will perform a best effort to extract the correct duration and allows deserialization from any type.
 For example, deserializing <code>DurationSeconds&lt;f64, Flexible&gt;</code> will discard any subsecond precision during deserialization from <code>f64</code> and will parse a <code>String</code> as an integer number.</p>
-<p>This type also supports <a href="::chrono_0_4::Duration"><code>chrono::Duration</code></a> with the <code>chrono</code>-<a href="https://docs.rs/serde_with/2.3.2/serde_with/guide/feature_flags/index.html">feature flag</a>.
-This type also supports [<code>time::Duration</code>][::time_0_3::Duration] with the <code>time_0_3</code>-<a href="https://docs.rs/serde_with/2.3.2/serde_with/guide/feature_flags/index.html">feature flag</a>.</p>
+<p>This type also supports <a href="::chrono_0_4::Duration"><code>chrono::Duration</code></a> with the <code>chrono</code>-<a href="https://docs.rs/serde_with/2.3.3/serde_with/guide/feature_flags/index.html">feature flag</a>.
+This type also supports [<code>time::Duration</code>][::time_0_3::Duration] with the <code>time_0_3</code>-<a href="https://docs.rs/serde_with/2.3.3/serde_with/guide/feature_flags/index.html">feature flag</a>.</p>
 <p>This table lists the available <code>FORMAT</code>s for the different duration types.
 The <code>FORMAT</code> specifier defaults to <code>u64</code>/<code>f64</code>.</p>
 <div><table><thead><tr><th>Duration Type</th><th>Converter</th><th>Available <code>FORMAT</code>s</th></tr></thead><tbody>

@@ -82,12 +82,21 @@
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
 <a href="#84" id="84">84</a>
-</pre><pre class="rust"><code><span class="kw">use </span>kube::CustomResource;
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+</pre><pre class="rust"><code><span class="kw">use </span>chrono::NaiveDate;
+<span class="kw">use </span>kube::CustomResource;
 <span class="kw">use </span>mirrord_config::target::{Target, TargetConfig};
 <span class="kw">use </span>schemars::JsonSchema;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="kw">use </span><span class="kw">crate</span>::license::License;
+<span class="kw">pub const </span>TARGETLESS_TARGET_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;targetless&quot;</span>;
 
 <span class="attr">#[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[kube(
@@ -98,7 +107,8 @@
     namespaced
 )]
 </span><span class="kw">pub struct </span>TargetSpec {
-    <span class="kw">pub </span>target: Target,
+    <span class="doccomment">/// None when targetless.
+    </span><span class="kw">pub </span>target: <span class="prelude-ty">Option</span>&lt;Target&gt;,
 }
 
 <span class="kw">impl </span>TargetCrd {
@@ -109,30 +119,28 @@
         }
     }
 
-    <span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="self">Self</span>::target_name(<span class="kw-2">&amp;</span><span class="self">self</span>.spec.target)
+    <span class="doccomment">/// &quot;targetless&quot; ([`TARGETLESS_TARGET_NAME`]) if `None`,
+    /// else &lt;resource_type&gt;.&lt;resource_name&gt;...
+    </span><span class="kw">pub fn </span>target_name_by_config(target_config: <span class="kw-2">&amp;</span>TargetConfig) -&gt; String {
+        target_config
+            .path
+            .as_ref()
+            .map_or_else(|| TARGETLESS_TARGET_NAME.to_string(), <span class="self">Self</span>::target_name)
     }
 
-    <span class="kw">pub fn </span>from_target(target_config: TargetConfig) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>target = target_config.path<span class="question-mark">?</span>;
-
-        <span class="kw">let </span>target_name = <span class="kw">match </span><span class="kw-2">&amp;</span>target {
-            Target::Deployment(target) =&gt; <span class="macro">format!</span>(<span class="string">&quot;deploy.{}&quot;</span>, target.deployment),
-            Target::Pod(target) =&gt; <span class="macro">format!</span>(<span class="string">&quot;pod.{}&quot;</span>, target.pod),
-        };
-
-        <span class="kw">let </span><span class="kw-2">mut </span>crd = TargetCrd::new(<span class="kw-2">&amp;</span>target_name, TargetSpec { target });
-
-        crd.metadata.namespace = target_config.namespace;
-
-        <span class="prelude-val">Some</span>(crd)
+    <span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.spec
+            .target
+            .as_ref()
+            .map(<span class="self">Self</span>::target_name)
+            .unwrap_or(TARGETLESS_TARGET_NAME.to_string())
     }
 }
 
 <span class="kw">impl </span>From&lt;TargetCrd&gt; <span class="kw">for </span>TargetConfig {
     <span class="kw">fn </span>from(crd: TargetCrd) -&gt; <span class="self">Self </span>{
         TargetConfig {
-            path: <span class="prelude-val">Some</span>(crd.spec.target),
+            path: crd.spec.target,
             namespace: crd.metadata.namespace,
         }
     }
@@ -151,7 +159,7 @@
 </span><span class="kw">pub struct </span>MirrordOperatorSpec {
     <span class="kw">pub </span>operator_version: String,
     <span class="kw">pub </span>default_namespace: String,
-    <span class="kw">pub </span>license: License,
+    <span class="kw">pub </span>license: LicenseInfoOwned,
 }
 
 <span class="attr">#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
@@ -165,5 +173,13 @@
     <span class="kw">pub </span>duration_secs: u64,
     <span class="kw">pub </span>user: String,
     <span class="kw">pub </span>target: String,
+}
+
+<span class="attr">#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+</span><span class="kw">pub struct </span>LicenseInfoOwned {
+    <span class="kw">pub </span>name: String,
+    <span class="kw">pub </span>organization: String,
+    <span class="kw">pub </span>expire_at: NaiveDate,
+    <span class="kw">pub </span>fingerprint: <span class="prelude-ty">Option</span>&lt;String&gt;,
 }
 </code></pre></div></section></main></body></html>

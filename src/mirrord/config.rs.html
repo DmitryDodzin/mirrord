@@ -305,10 +305,6 @@
 <a href="#305" id="305">305</a>
 <a href="#306" id="306">306</a>
 <a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
 </pre><pre class="rust"><code><span class="attr">#![deny(missing_docs)]
 
 </span><span class="kw">use </span>std::path::PathBuf;
@@ -352,9 +348,6 @@ Join our Discord server at https://discord.gg/metalbear, create a GitHub issue a
 
     <span class="attr">#[command(hide = <span class="bool-val">true</span>)]
     </span>Extract { path: String },
-    <span class="attr">#[allow(dead_code)]
-    #[command(skip)]
-    </span>Login(LoginArgs),
     <span class="doccomment">/// Operator commands eg. setup
     </span><span class="attr">#[command(hide = <span class="bool-val">true</span>)]
     </span>Operator(Box&lt;OperatorArgs&gt;),
@@ -397,13 +390,8 @@ Join our Discord server at https://discord.gg/metalbear, create a GitHub issue a
 }
 
 <span class="attr">#[derive(Args, Debug)]
-#[command(group(
-    ArgGroup::new(<span class="string">&quot;exec&quot;</span>)
-        .required(<span class="bool-val">true</span>)
-        .multiple(<span class="bool-val">true</span>)
-        .args(<span class="kw-2">&amp;</span>[<span class="string">&quot;target&quot;</span>, <span class="string">&quot;config_file&quot;</span>]</span>),
-))]
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">struct </span>ExecArgs {
+#[command(group(ArgGroup::new(<span class="string">&quot;exec&quot;</span>)))]
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">struct </span>ExecArgs {
     <span class="doccomment">/// Target name to mirror.    
     /// Target can either be a deployment or a pod.
     /// Valid formats: deployment/name, pod/name, pod/name/container/name
@@ -540,6 +528,10 @@ Join our Discord server at https://discord.gg/metalbear, create a GitHub issue a
         <span class="doccomment">/// License key to be stored in mirrord-operator-license secret
         </span><span class="attr">#[arg(long)]
         </span>license_key: <span class="prelude-ty">Option</span>&lt;String&gt;,
+
+        <span class="doccomment">/// License key file path to be stored in mirrord-operator-license secret
+        </span><span class="attr">#[arg(long)]
+        </span>license_path: <span class="prelude-ty">Option</span>&lt;PathBuf&gt;,
 
         <span class="doccomment">/// Output to kubernetes specs to file instead of stdout and piping to kubectl
         </span><span class="attr">#[arg(short, long)]
