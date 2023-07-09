@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_kube_api"],"opaque":[""],"static":["CALLSITE","META"],"struct":["KubernetesAPI"]};
+window.SIDEBAR_ITEMS = {"fn":["create_kube_api"],"mod":["rollout"],"static":["CALLSITE"],"struct":["KubernetesAPI"]};
