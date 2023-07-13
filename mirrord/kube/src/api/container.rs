@@ -1,20 +1,18 @@
-use std::{collections::HashSet, sync::LazyLock};
+use std::{collections::HashSet, sync::LazyLock, time::Duration};
 
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ContainerStatus, EphemeralContainer as KubeEphemeralContainer, Pod},
 };
 use kube::{
     api::{ListParams, LogParams, PostParams},
-    runtime::{watcher, WatchStreamExt},
     Api, Client,
 };
 use mirrord_config::agent::AgentConfig;
 use mirrord_progress::Progress;
 use rand::distributions::{Alphanumeric, DistString};
 use serde_json::json;
-use tokio::pin;
 use tracing::{debug, warn};
 
 use crate::{
@@ -277,26 +275,28 @@ impl ContainerApi for JobContainer {
             .await
             .map_err(KubeApiError::KubeError)?;
 
-        let watcher_config = watcher::Config::default()
-            .labels(&format!("job-name={mirrord_agent_job_name}"))
-            .timeout(60);
-
         pod_progress.done_with("agent pod created");
 
         let pod_progress = progress.subtask("waiting for pod to be ready...");
 
         let pod_api: Api<Pod> = get_k8s_resource_api(client, agent.namespace.as_deref());
 
-        let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
-        pin!(stream);
+        while let Ok(pod) = pod_api
+            .list(&ListParams::default().labels(&format!("job-name={mirrord_agent_job_name}")))
+            .await
+            .map(|list| list.items.into_iter().next())
+        {
+            if let Some(pod) = pod {
+                if let Some(status) = &pod.status && let Some(phase) = &status.phase {
+                    debug!("Pod Phase = {phase:?}");
 
-        while let Some(Ok(pod)) = stream.next().await {
-            if let Some(status) = &pod.status && let Some(phase) = &status.phase {
-                        debug!("Pod Phase = {phase:?}");
                     if phase == "Running" {
                         break;
                     }
+
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
+            }
         }
 
         let pods = pod_api
@@ -407,24 +407,22 @@ impl ContainerApi for EphemeralContainer {
             .await
             .map_err(KubeApiError::KubeError)?;
 
-        let watcher_config = watcher::Config::default()
-            .fields(&format!("metadata.name={}", &runtime_data.pod_name))
-            .timeout(60);
-
         container_progress.done_with("container created");
 
         let container_progress = progress.subtask("waiting for container to be ready...");
 
-        let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
-        pin!(stream);
-
-        while let Some(Ok(pod)) = stream.next().await {
+        while let Ok(pod) = pod_api
+            .get_subresource("ephemeralcontainers", &runtime_data.pod_name)
+            .await
+        {
             if is_ephemeral_container_running(pod, &mirrord_agent_name) {
                 debug!("container ready");
                 break;
             } else {
                 debug!("container not ready yet");
             }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
         wait_for_agent_startup(&pod_api, &runtime_data.pod_name, mirrord_agent_name).await?;
