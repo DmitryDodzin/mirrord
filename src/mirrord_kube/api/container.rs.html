@@ -433,9 +433,12 @@
 <a href="#433" id="433">433</a>
 <a href="#434" id="434">434</a>
 <a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashSet, sync::LazyLock};
 
-<span class="kw">use </span>futures::{StreamExt, TryStreamExt};
+<span class="kw">use </span>futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
 <span class="kw">use </span>k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ContainerStatus, EphemeralContainer <span class="kw">as </span>KubeEphemeralContainer, Pod},
@@ -445,7 +448,7 @@
     runtime::{watcher, WatchStreamExt},
     Api, Client,
 };
-<span class="kw">use </span>mirrord_config::agent::AgentConfig;
+<span class="kw">use </span>mirrord_config::agent::{AgentConfig, LinuxCapability};
 <span class="kw">use </span>mirrord_progress::Progress;
 <span class="kw">use </span>rand::distributions::{Alphanumeric, DistString};
 <span class="kw">use </span>serde_json::json;
@@ -456,6 +459,17 @@
     api::{get_k8s_resource_api, runtime::RuntimeData},
     error::{KubeApiError, <span class="prelude-ty">Result</span>},
 };
+
+<span class="doccomment">/// Retrieve a list of Linux capabilities for the agent container.
+</span><span class="kw">fn </span>get_capabilities(config: <span class="kw-2">&amp;</span>AgentConfig) -&gt; Vec&lt;LinuxCapability&gt; {
+    <span class="kw">let </span>disabled = config.disabled_capabilities.clone().unwrap_or_default();
+
+    LinuxCapability::all()
+        .iter()
+        .copied()
+        .filter(|c| !disabled.contains(c))
+        .collect()
+}
 
 <span class="kw">pub trait </span>ContainerApi {
     <span class="kw">fn </span>agent_image(agent: <span class="kw-2">&amp;</span>AgentConfig) -&gt; String {
@@ -534,7 +548,7 @@
     pod_name: <span class="kw-2">&amp;</span>str,
     container_name: String,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>logs = pod_api
+    <span class="kw">let </span>logs = pod_api
         .log_stream(
             pod_name,
             <span class="kw-2">&amp;</span>LogParams {
@@ -545,8 +559,8 @@
         )
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">while let </span><span class="prelude-val">Some</span>(line) = logs.try_next().<span class="kw">await</span><span class="question-mark">? </span>{
-        <span class="kw">let </span>line = String::from_utf8_lossy(<span class="kw-2">&amp;</span>line);
+    <span class="kw">let </span><span class="kw-2">mut </span>lines = logs.lines();
+    <span class="kw">while let </span><span class="prelude-val">Some</span>(line) = lines.try_next().<span class="kw">await</span><span class="question-mark">? </span>{
         <span class="kw">if </span>line.contains(<span class="string">&quot;agent ready&quot;</span>) {
             <span class="kw">break</span>;
         }
@@ -658,11 +672,7 @@
                                     <span class="macro">json!</span>({
                                         <span class="string">&quot;runAsGroup&quot;</span>: agent_gid,
                                         <span class="string">&quot;capabilities&quot;</span>: {
-                                            <span class="string">&quot;add&quot;</span>: [
-                                                <span class="string">&quot;NET_ADMIN&quot;</span>,
-                                                <span class="string">&quot;SYS_PTRACE&quot;</span>,
-                                                <span class="string">&quot;SYS_ADMIN&quot;
-                                            </span>]
+                                            <span class="string">&quot;add&quot;</span>: get_capabilities(agent),
                                         }
                                     })
                                 ),
@@ -793,11 +803,7 @@
             <span class="string">&quot;securityContext&quot;</span>: {
                 <span class="string">&quot;runAsGroup&quot;</span>: agent_gid,
                 <span class="string">&quot;capabilities&quot;</span>: {
-                    <span class="string">&quot;add&quot;</span>: [
-                        <span class="string">&quot;NET_ADMIN&quot;</span>,
-                        <span class="string">&quot;SYS_PTRACE&quot;</span>,
-                        <span class="string">&quot;SYS_ADMIN&quot;
-                    </span>]
+                    <span class="string">&quot;add&quot;</span>: get_capabilities(agent),
                 },
             },
             <span class="string">&quot;imagePullPolicy&quot;</span>: agent.image_pull_policy,

@@ -245,8 +245,6 @@
     </span>FirstConnectionTimeout,
     <span class="attr">#[error(<span class="string">&quot;Couldn&#39;t accept connection {0:#?}&quot;</span>)]
     </span>AcceptError(std::io::Error),
-    <span class="attr">#[error(<span class="string">&quot;Couldn&#39;t connect to operator &quot;</span>)]
-    </span>OperatorConnectionError,
     <span class="attr">#[error(<span class="string">&quot;Couldn&#39;t connect to agent via TCP {0:#?}&quot;</span>)]
     </span>TcpConnectError(std::io::Error),
     <span class="attr">#[error(<span class="string">&quot;Agent closed connection on ping/pong, image version/arch mismatch?&quot;</span>)]
@@ -255,6 +253,8 @@
     </span>PingError(<span class="attr">#[from] </span>tokio::sync::mpsc::error::SendError&lt;mirrord_protocol::ClientMessage&gt;),
     <span class="attr">#[error(<span class="string">&quot;Set sid failed {0:#?}, please report a bug&quot;</span>)]
     </span>SetSidError(nix::Error),
+    <span class="attr">#[error(<span class="string">&quot;No connection method, please report a bug&quot;</span>)]
+    </span>NoConnectionMethod,
 }
 
 <span class="attr">#[derive(Debug, Error, Diagnostic)]

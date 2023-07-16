@@ -255,12 +255,19 @@
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{HashMap, HashSet},
     time::Duration,
 };
 
 <span class="kw">use </span>mirrord_config::LayerConfig;
+<span class="kw">use </span>mirrord_operator::client::OperatorSessionInformation;
 <span class="kw">use </span>mirrord_progress::Progress;
 <span class="kw">use </span>mirrord_protocol::{
     pause::DaemonPauseTarget, ClientMessage, DaemonMessage, EnvVars, GetEnvVarsRequest,
@@ -393,7 +400,12 @@
                 proxy_command.env(<span class="string">&quot;MIRRORD_CONNECT_AGENT&quot;</span>, name);
                 proxy_command.env(<span class="string">&quot;MIRRORD_CONNECT_PORT&quot;</span>, port.to_string());
             }
-            AgentConnectInfo::Operator =&gt; {}
+            AgentConnectInfo::Operator(session) =&gt; {
+                proxy_command.env(
+                    OperatorSessionInformation::env_key(),
+                    serde_json::to_string(<span class="kw-2">&amp;</span>session)<span class="question-mark">?</span>,
+                );
+            }
         };
 
         <span class="kw">let </span><span class="kw-2">mut </span>proxy_process = proxy_command
