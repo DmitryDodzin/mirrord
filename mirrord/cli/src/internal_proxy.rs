@@ -11,6 +11,7 @@
 //! or let the [`OperatorApi`] handle the connection.
 
 use std::{
+    convert::Infallible,
     io::ErrorKind,
     net::{Ipv4Addr, SocketAddrV4},
     time::Duration,
@@ -26,10 +27,11 @@ use mirrord_protocol::{pause::DaemonPauseTarget, ClientMessage, DaemonCodec, Dae
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
-    sync::mpsc::{self},
+    sync::mpsc,
     task::JoinSet,
     time::timeout,
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, log::trace};
 
 use crate::{
@@ -160,6 +162,24 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         })??;
     }
 
+    let main_connection_cancalation_token = CancellationToken::new();
+    let interval_main_connection_cancalation_token = main_connection_cancalation_token.clone();
+
+    let main_task_join = tokio::spawn(async move {
+        let mut main_keep_interval = tokio::time::interval(Duration::from_secs(30));
+        main_keep_interval.tick().await;
+
+        loop {
+            main_keep_interval.tick().await;
+
+            if let Err(err) = ping(&mut main_connection.0, &mut main_connection.1).await {
+                interval_main_connection_cancalation_token.cancel();
+
+                return Err::<Infallible, InternalProxyError>(err);
+            }
+        }
+    });
+
     print_port(&listener)?;
 
     // wait for first connection `FIRST_CONNECTION_TIMEOUT` seconds, or timeout.
@@ -188,6 +208,7 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
                 }
             },
             _ = active_connections.join_next(), if !active_connections.is_empty() => {},
+            _ = main_connection_cancalation_token.cancelled() => { break; }
             _ = tokio::time::sleep(Duration::from_secs(5)) => {
                 if active_connections.is_empty() {
                     break;
@@ -195,6 +216,8 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
             }
         }
     }
+    main_connection_cancalation_token.cancel();
+
     let mut analytics = Analytics::default();
     (&config).collect_analytics(&mut analytics);
     if config.telemetry {
@@ -205,6 +228,11 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         )
         .await;
     }
+
+    if let Ok(Err(err)) = main_task_join.await {
+        return Err(err.into());
+    }
+
     Ok(())
 }
 
