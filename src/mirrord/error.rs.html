@@ -213,6 +213,8 @@
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
 <a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">use </span>miette::Diagnostic;
@@ -255,6 +257,8 @@
     </span>SetSidError(nix::Error),
     <span class="attr">#[error(<span class="string">&quot;No connection method, please report a bug&quot;</span>)]
     </span>NoConnectionMethod,
+    <span class="attr">#[error(<span class="string">&quot;Failed pausing target container {0:#?}&quot;</span>)]
+    </span>PauseError(String),
 }
 
 <span class="attr">#[derive(Debug, Error, Diagnostic)]
