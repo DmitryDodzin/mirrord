@@ -27,7 +27,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     select,
     sync::mpsc,
-    task::JoinSet,
+    task::{JoinHandle, JoinSet},
     time::timeout,
 };
 use tokio_util::sync::CancellationToken;
@@ -161,30 +161,7 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         })??;
     }
 
-    let main_connection_cancalation_token = CancellationToken::new();
-    let interval_main_connection_cancalation_token = main_connection_cancalation_token.clone();
-
-    let main_task_join = tokio::spawn(async move {
-        let mut main_keep_interval = tokio::time::interval(Duration::from_secs(30));
-        main_keep_interval.tick().await;
-
-        loop {
-            tokio::select! {
-                _ = main_keep_interval.tick() => {
-                    if let Err(err) = ping(&mut main_connection.0, &mut main_connection.1).await {
-                        interval_main_connection_cancalation_token.cancel();
-
-                        return Err(err);
-                    }
-                }
-                _ = interval_main_connection_cancalation_token.cancelled() => {
-                    break;
-                }
-            }
-        }
-
-        Ok(())
-    });
+    let (main_connection_cancalation_token, main_task_join) = create_ping_loop(main_connection);
 
     print_port(&listener)?;
 
@@ -266,6 +243,43 @@ async fn ping(
         Some(DaemonMessage::Pong) => Ok(()),
         _ => Err(InternalProxyError::AgentClosedConnection),
     }
+}
+
+fn create_ping_loop(
+    mut connection: (mpsc::Sender<ClientMessage>, mpsc::Receiver<DaemonMessage>),
+) -> (
+    CancellationToken,
+    JoinHandle<Result<(), InternalProxyError>>,
+) {
+    let cancalation_token = CancellationToken::new();
+
+    let join_handle = tokio::spawn({
+        let cancalation_token = cancalation_token.clone();
+
+        async move {
+            let mut main_keep_interval = tokio::time::interval(Duration::from_secs(30));
+            main_keep_interval.tick().await;
+
+            loop {
+                tokio::select! {
+                    _ = main_keep_interval.tick() => {
+                        if let Err(err) = ping(&mut connection.0, &mut connection.1).await {
+                            cancalation_token.cancel();
+
+                            return Err(err);
+                        }
+                    }
+                    _ = cancalation_token.cancelled() => {
+                        break;
+                    }
+                }
+            }
+
+            Ok(())
+        }
+    });
+
+    (cancalation_token, join_handle)
 }
 
 /// Connects to an agent pod depending on how [`LayerConfig`] is set-up:
