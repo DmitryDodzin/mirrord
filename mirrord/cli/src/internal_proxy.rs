@@ -161,7 +161,8 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         })??;
     }
 
-    let (main_connection_cancalation_token, main_task_join) = create_ping_loop(main_connection);
+    let (main_connection_cancalation_token, main_connection_task_join) =
+        create_ping_loop(main_connection);
 
     print_port(&listener)?;
 
@@ -212,7 +213,7 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         .await;
     }
 
-    if let Ok(Err(err)) = main_task_join.await {
+    if let Ok(Err(err)) = main_connection_task_join.await {
         return Err(err.into());
     }
 
