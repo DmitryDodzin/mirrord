@@ -11,7 +11,6 @@
 //! or let the [`OperatorApi`] handle the connection.
 
 use std::{
-    convert::Infallible,
     io::ErrorKind,
     net::{Ipv4Addr, SocketAddrV4},
     time::Duration,
@@ -170,14 +169,21 @@ pub(crate) async fn proxy(args: InternalProxyArgs) -> Result<()> {
         main_keep_interval.tick().await;
 
         loop {
-            main_keep_interval.tick().await;
+            tokio::select! {
+                _ = main_keep_interval.tick() => {
+                    if let Err(err) = ping(&mut main_connection.0, &mut main_connection.1).await {
+                        interval_main_connection_cancalation_token.cancel();
 
-            if let Err(err) = ping(&mut main_connection.0, &mut main_connection.1).await {
-                interval_main_connection_cancalation_token.cancel();
-
-                return Err::<Infallible, InternalProxyError>(err);
+                        return Err(err);
+                    }
+                }
+                _ = interval_main_connection_cancalation_token.cancelled() => {
+                    break;
+                }
             }
         }
+
+        Ok(())
     });
 
     print_port(&listener)?;
