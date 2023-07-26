@@ -110,7 +110,7 @@ pub struct OutgoingConfig {
     ///
     /// Defaults to `false`.
     // Consider removing when adding https://github.com/metalbear-co/mirrord/issues/702
-    #[config(unstable, env = "MIRRORD_IGNORE_LOCALHOST", default = false)]
+    #[config(unstable, default = false)]
     pub ignore_localhost: bool,
 
     /// #### feature.network.outgoing.filter {#feature.network.outgoing.filter}
@@ -148,10 +148,6 @@ impl MirrordToggleableConfig for OutgoingFileConfig {
             unix_streams: FromEnv::new("MIRRORD_OUTGOING_REMOTE_UNIX_STREAMS")
                 .source_value()
                 .transpose()?,
-            ignore_localhost: FromEnv::new("MIRRORD_IGNORE_LOCALHOST")
-                .source_value()
-                .transpose()?
-                .unwrap_or_default(),
             ..Default::default()
         })
     }
