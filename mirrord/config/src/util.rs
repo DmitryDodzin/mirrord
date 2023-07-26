@@ -9,11 +9,11 @@ use serde::{
 use crate::config::{ConfigError, FromMirrordConfig, MirrordConfig, Result};
 
 pub trait MirrordToggleableConfig: MirrordConfig + Default {
-    fn enabled_config() -> Result<Self::Generated, ConfigError> {
+    fn enabled_config() -> Result<Self::Generated> {
         Self::default().generate_config()
     }
 
-    fn disabled_config() -> Result<Self::Generated, ConfigError>;
+    fn disabled_config() -> Result<Self::Generated>;
 }
 
 #[derive(Deserialize, PartialEq, Eq, Clone, Debug, JsonSchema)]
@@ -35,7 +35,7 @@ where
 {
     type Generated = T::Generated;
 
-    fn generate_config(self) -> Result<Self::Generated, ConfigError> {
+    fn generate_config(self) -> Result<Self::Generated> {
         match self {
             ToggleableConfig::Enabled(true) => T::enabled_config(),
             ToggleableConfig::Enabled(false) => T::disabled_config(),
@@ -178,11 +178,18 @@ where
     deserializer.deserialize_any(StringOrStruct(PhantomData))
 }
 
-pub fn shellexpand_tilde<T>(path: T) -> String
+pub fn shellexpand_tilde<T>(path: T) -> Result<String>
 where
     T: AsRef<str>,
 {
-    shellexpand::tilde(path.as_ref()).into_owned()
+    Ok(shellexpand::tilde(path.as_ref()).into_owned())
+}
+
+pub fn shellexpand_tilde_opt<T>(path: Option<T>) -> Result<Option<String>>
+where
+    T: AsRef<str>,
+{
+    path.map(shellexpand_tilde).transpose()
 }
 
 #[cfg(test)]

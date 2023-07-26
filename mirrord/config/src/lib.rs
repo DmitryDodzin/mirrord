@@ -248,7 +248,7 @@ pub struct LayerConfig {
     ///  "kubeconfig": "~/bear/kube-config"
     /// }
     /// ```
-    #[config(env = "MIRRORD_KUBECONFIG", transform = "util::shellexpand_tilde")]
+    #[config(env = "MIRRORD_KUBECONFIG", transform = "util::shellexpand_tilde_opt")]
     pub kubeconfig: Option<String>,
 
     /// ## sip_binaries {#root-sip_binaries}
