@@ -178,6 +178,13 @@ where
     deserializer.deserialize_any(StringOrStruct(PhantomData))
 }
 
+pub fn shellexpand_tilde<T>(path: T) -> String
+where
+    T: AsRef<str>,
+{
+    shellexpand::tilde(path.as_ref()).into_owned()
+}
+
 #[cfg(test)]
 pub mod testing {
     use std::{

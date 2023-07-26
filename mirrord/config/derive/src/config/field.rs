@@ -137,9 +137,13 @@ impl ConfigField {
             ..
         } = &self;
 
+        let transform = flags.transform.as_ref().map(|transform_ident| {
+            quote! { .map(#transform_ident) }
+        });
+
         // Rest of flow is irrelevant for nested config.
         if flags.nested {
-            return quote! { #ident: self.#ident.unwrap_or_default().generate_config()? };
+            return quote! { #ident: self.#ident.unwrap_or_default().generate_config()? #transform };
         }
 
         let mut impls = Vec::new();
@@ -183,9 +187,9 @@ impl ConfigField {
             .reduce(|acc, impl_| quote! { #acc.or(#impl_) });
 
         if layers.is_empty() {
-            quote! { #ident: #impls .source_value().transpose()?#unwrapper }
+            quote! { #ident: #impls .source_value().transpose()? #transform #unwrapper }
         } else {
-            quote! { #ident: #impls #(#layers),* .source_value().transpose()?#unwrapper }
+            quote! { #ident: #impls #(#layers),* .source_value().transpose()? #transform #unwrapper }
         }
     }
 }

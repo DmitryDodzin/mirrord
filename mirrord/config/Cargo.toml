@@ -24,6 +24,7 @@ tracing.workspace = true
 serde_yaml = "0.9"
 toml = "0.7"
 schemars = { version = "0.8.11" }
+shellexpand = "3"
 bimap.workspace = true
 nom = "7.1"
 ipnet = "2.8"

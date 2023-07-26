@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostics::{Diagnostic, SpanDiagnosticExt};
 use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Attribute, Ident, Lit, Meta, NestedMeta};
+use syn::{spanned::Spanned, Attribute, Ident, Lit, Meta, NestedMeta, Path};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConfigFlagsType {
@@ -13,7 +13,7 @@ pub enum ConfigFlagsType {
 //* Contains flags parsed from `#[config(...)]` and `#[doc]` attributes
 //*
 //* ConfigFlagsType::Container -> ["derive", "generator", "map_to"]
-//* ConfigFlagsType::Field -> ["default", "env", "nested", "rename", "toggleable"]
+//* ConfigFlagsType::Field -> ["default", "env", "nested", "rename", "toggleable", "transform"]
 ///
 #[derive(Debug, Default)]
 pub struct ConfigFlags {
@@ -30,6 +30,7 @@ pub struct ConfigFlags {
     pub toggleable: bool,
     pub unstable: bool,
     pub deprecated: Option<Lit>,
+    pub transform: Option<Path>,
 }
 
 impl ConfigFlags {
@@ -91,6 +92,25 @@ impl ConfigFlags {
                                 && meta.path.is_ident("deprecated") =>
                         {
                             flags.deprecated = Some(meta.lit)
+                        }
+                        NestedMeta::Meta(Meta::NameValue(meta))
+                            if mode == ConfigFlagsType::Field
+                                && meta.path.is_ident("transform") =>
+                        {
+                            match meta.lit {
+                                Lit::Str(val) => {
+                                    flags.transform = Some(
+                                        syn::parse_str(&val.value())
+                                            .map_err(|err| val.span().error(format!("{err}")))?,
+                                    )
+                                }
+                                _ => {
+                                    return Err(meta
+                                        .lit
+                                        .span()
+                                        .error("transform should be a string literal as value"))
+                                }
+                            }
                         }
                         NestedMeta::Meta(Meta::NameValue(meta))
                             if mode == ConfigFlagsType::Container
