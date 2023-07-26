@@ -82,7 +82,7 @@ use std::{
 
 use bimap::BiMap;
 use common::ResponseChannel;
-use ctor::ctor;
+use ctor::{ctor, dtor};
 use dns::GetAddrInfo;
 use error::{LayerError, Result};
 use file::{filter::FileFilter, OPEN_FILES};
@@ -376,6 +376,16 @@ fn mirrord_layer_entry_point() {
                 }
             }
         });
+    }
+}
+
+#[dtor]
+unsafe fn mirrord_layer_exit() {
+    if RUNTIME.is_some() {
+        RUNTIME
+            .take()
+            .unwrap()
+            .shutdown_timeout(Duration::from_millis(100))
     }
 }
 

@@ -103,6 +103,11 @@ impl MirrordConfig for IncomingFileConfig {
                     .source_value()
                     .transpose()?
                     .unwrap_or_default(),
+                ignore_localhost: FromEnv::new("MIRRORD_IGNORE_LOCALHOST")
+                    .layer(|layer| Unstable::new("IncomingFileConfig", "ignore_localhost", layer))
+                    .source_value()
+                    .transpose()?
+                    .unwrap_or_default(),
                 ..Default::default()
             },
             IncomingFileConfig::Advanced(advanced) => IncomingConfig {
@@ -124,8 +129,8 @@ impl MirrordConfig for IncomingFileConfig {
                     .ignore_ports
                     .map(|m| m.into_iter().collect())
                     .unwrap_or_default(),
-                ignore_localhost: advanced
-                    .ignore_localhost
+                ignore_localhost: FromEnv::new("MIRRORD_IGNORE_LOCALHOST")
+                    .or(advanced.ignore_localhost)
                     .layer(|layer| Unstable::new("IncomingFileConfig", "ignore_localhost", layer))
                     .source_value()
                     .transpose()?
