@@ -77,7 +77,7 @@ use std::{
     mem,
     net::SocketAddr,
     panic,
-    sync::{OnceLock, RwLock},
+    sync::{LazyLock, OnceLock, RwLock},
 };
 
 use bimap::BiMap;
@@ -115,6 +115,7 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     time::{Duration, Interval},
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*};
 
@@ -200,6 +201,9 @@ static mut RUNTIME: Option<Runtime> = None;
 pub(crate) static HOOK_SENDER: OnceLock<RwLock<Sender<HookMessage>>> = OnceLock::new();
 
 pub(crate) static LAYER_INITIALIZED: OnceLock<()> = OnceLock::new();
+
+pub(crate) static GLOBAL_CANCEL: LazyLock<CancellationToken> =
+    LazyLock::new(CancellationToken::new);
 
 /// Holds the file operations configuration, as specified by [`FsConfig`].
 ///
@@ -381,12 +385,7 @@ fn mirrord_layer_entry_point() {
 
 #[dtor]
 unsafe fn mirrord_layer_exit() {
-    if RUNTIME.is_some() {
-        RUNTIME
-            .take()
-            .unwrap()
-            .shutdown_timeout(Duration::from_millis(100))
-    }
+    GLOBAL_CANCEL.cancel();
 }
 
 /// Initialize logger. Set the logs to go according to the layer's config either to a trace file, to
@@ -911,6 +910,10 @@ async fn thread_loop(
             }
             Some(response) = layer.http_response_receiver.recv() => {
                 layer.send(ClientMessage::TcpSteal(LayerTcpSteal::HttpResponse(response))).await.unwrap();
+            }
+            _ = GLOBAL_CANCEL.cancelled() => {
+                trace!("GLOBAL_CANCEL cancelled");
+                break;
             }
             _ = layer.ping_interval.tick() => {
                 if !layer.ping {

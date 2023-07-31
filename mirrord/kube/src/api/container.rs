@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::LazyLock};
+use std::{collections::HashSet, sync::LazyLock, time::Duration};
 
 use futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
 use k8s_openapi::api::{
@@ -298,16 +298,40 @@ impl ContainerApi for JobContainer {
 
         let pod_api: Api<Pod> = get_k8s_resource_api(client, agent.namespace.as_deref());
 
-        let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
-        pin!(stream);
+        if cfg!(feature = "incluster") {
+            loop {
+                let pods = pod_api
+                    .list(
+                        &ListParams::default()
+                            .labels(&format!("job-name={mirrord_agent_job_name}")),
+                    )
+                    .await
+                    .map_err(KubeApiError::KubeError)?;
 
-        while let Some(Ok(pod)) = stream.next().await {
-            if let Some(status) = &pod.status && let Some(phase) = &status.phase {
+                if pods
+                    .items
+                    .iter()
+                    .filter_map(|pod| pod.status.as_ref()?.phase.as_ref())
+                    .inspect(|phase| debug!("Pod Phase = {phase:?}"))
+                    .all(|phase| phase == "Running")
+                {
+                    break;
+                } else {
+                    tokio::time::sleep(Duration::from_millis(100)).await
+                }
+            }
+        } else {
+            let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
+            pin!(stream);
+
+            while let Some(Ok(pod)) = stream.next().await {
+                if let Some(status) = &pod.status && let Some(phase) = &status.phase {
                         debug!("Pod Phase = {phase:?}");
                     if phase == "Running" {
                         break;
                     }
                 }
+            }
         }
 
         let pods = pod_api
@@ -421,15 +445,32 @@ impl ContainerApi for EphemeralContainer {
 
         let container_progress = progress.subtask("waiting for container to be ready...");
 
-        let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
-        pin!(stream);
+        if cfg!(feature = "incluster") {
+            loop {
+                let pod: Pod = pod_api
+                    .get_subresource("ephemeralcontainers", &runtime_data.pod_name)
+                    .await
+                    .map_err(KubeApiError::KubeError)?;
 
-        while let Some(Ok(pod)) = stream.next().await {
-            if is_ephemeral_container_running(pod, &mirrord_agent_name) {
-                debug!("container ready");
-                break;
-            } else {
-                debug!("container not ready yet");
+                if is_ephemeral_container_running(pod, &mirrord_agent_name) {
+                    debug!("container ready");
+                    break;
+                } else {
+                    debug!("container not ready yet");
+                    tokio::time::sleep(Duration::from_millis(100)).await
+                }
+            }
+        } else {
+            let stream = watcher(pod_api.clone(), watcher_config).applied_objects();
+            pin!(stream);
+
+            while let Some(Ok(pod)) = stream.next().await {
+                if is_ephemeral_container_running(pod, &mirrord_agent_name) {
+                    debug!("container ready");
+                    break;
+                } else {
+                    debug!("container not ready yet");
+                }
             }
         }
 
