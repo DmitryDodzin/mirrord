@@ -77,7 +77,7 @@ use std::{
     mem,
     net::SocketAddr,
     panic,
-    sync::{LazyLock, OnceLock, RwLock},
+    sync::{OnceLock, RwLock},
 };
 
 use bimap::BiMap;
@@ -180,6 +180,8 @@ fn build_runtime() -> Runtime {
 /// `on_thread_stop`.
 static mut RUNTIME: Option<Runtime> = None;
 
+static mut GLOBAL_CANCEL: Option<CancellationToken> = None;
+
 // TODO: We don't really need a lock, we just need a type that:
 //  1. Can be initialized as static (with a const constructor or whatever)
 //  2. Is `Sync` (because shared static vars have to be).
@@ -201,9 +203,6 @@ static mut RUNTIME: Option<Runtime> = None;
 pub(crate) static HOOK_SENDER: OnceLock<RwLock<Sender<HookMessage>>> = OnceLock::new();
 
 pub(crate) static LAYER_INITIALIZED: OnceLock<()> = OnceLock::new();
-
-pub(crate) static GLOBAL_CANCEL: LazyLock<CancellationToken> =
-    LazyLock::new(CancellationToken::new);
 
 /// Holds the file operations configuration, as specified by [`FsConfig`].
 ///
@@ -385,7 +384,9 @@ fn mirrord_layer_entry_point() {
 
 #[dtor]
 unsafe fn mirrord_layer_exit() {
-    GLOBAL_CANCEL.cancel();
+    if let Some(global_cancel) = GLOBAL_CANCEL.as_ref() {
+        global_cancel.cancel();
+    }
 }
 
 /// Initialize logger. Set the logs to go according to the layer's config either to a trace file, to
@@ -859,6 +860,16 @@ async fn thread_loop(
             },
         ..
     } = config;
+
+    let global_cancel = unsafe {
+        if let Some(old_cancel) = GLOBAL_CANCEL.take() {
+            mem::forget(old_cancel);
+        }
+
+        GLOBAL_CANCEL = Some(CancellationToken::new());
+        GLOBAL_CANCEL.as_ref().unwrap()
+    };
+
     let mut layer = Layer::new(tx, rx, incoming);
     layer.ping_interval.tick().await;
 
@@ -911,7 +922,7 @@ async fn thread_loop(
             Some(response) = layer.http_response_receiver.recv() => {
                 layer.send(ClientMessage::TcpSteal(LayerTcpSteal::HttpResponse(response))).await.unwrap();
             }
-            _ = GLOBAL_CANCEL.cancelled() => {
+            _ = global_cancel.cancelled() => {
                 trace!("GLOBAL_CANCEL cancelled");
                 break;
             }

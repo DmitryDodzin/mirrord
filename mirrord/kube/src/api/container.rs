@@ -345,7 +345,7 @@ impl ContainerApi for JobContainer {
             .and_then(|pod| pod.metadata.name.clone())
             .ok_or(KubeApiError::JobPodNotFound(mirrord_agent_job_name))?;
 
-        wait_for_agent_startup(&pod_api, &pod_name, "mirrord-agent".to_string()).await?;
+        // wait_for_agent_startup(&pod_api, &pod_name, "mirrord-agent".to_string()).await?;
 
         pod_progress.done_with("pod is ready");
 
@@ -472,9 +472,9 @@ impl ContainerApi for EphemeralContainer {
                     debug!("container not ready yet");
                 }
             }
-        }
 
-        wait_for_agent_startup(&pod_api, &runtime_data.pod_name, mirrord_agent_name).await?;
+            wait_for_agent_startup(&pod_api, &runtime_data.pod_name, mirrord_agent_name).await?;
+        }
 
         container_progress.done_with("container is ready");
 
