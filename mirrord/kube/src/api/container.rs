@@ -142,7 +142,7 @@ pub struct JobContainer;
 
 impl ContainerApi for JobContainer {
     /// runtime_data is `None` when targetless.
-    #[tracing::instrument(level = "trace", skip(client, progress))]
+    #[tracing::instrument(level = "trace", skip(client, progress), ret)]
     async fn create_agent<P>(
         client: &Client,
         agent: &AgentConfig,
@@ -358,7 +358,7 @@ impl ContainerApi for JobContainer {
 pub struct EphemeralContainer;
 
 impl ContainerApi for EphemeralContainer {
-    #[tracing::instrument(level = "trace", skip(client, progress))]
+    #[tracing::instrument(level = "trace", skip(client, progress), ret)]
     async fn create_agent<P>(
         client: &Client,
         agent: &AgentConfig,
