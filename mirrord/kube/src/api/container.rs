@@ -309,12 +309,13 @@ impl ContainerApi for JobContainer {
                     .await
                     .map_err(KubeApiError::KubeError)?;
 
-                if pods
-                    .items
-                    .iter()
-                    .filter_map(|pod| pod.status.as_ref()?.phase.as_ref())
-                    .inspect(|phase| debug!("Pod Phase = {phase:?}"))
-                    .all(|phase| phase == "Running")
+                if !pods.items.is_empty()
+                    && pods
+                        .items
+                        .iter()
+                        .filter_map(|pod| pod.status.as_ref()?.phase.as_ref())
+                        .inspect(|phase| debug!("Pod Phase = {phase:?}"))
+                        .all(|phase| phase == "Running")
                 {
                     break;
                 } else {
