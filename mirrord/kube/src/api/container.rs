@@ -476,7 +476,7 @@ impl ContainerApi for EphemeralContainer {
                 }
             }
 
-            wait_for_agent_startup(&pod_api, &runtime_data.pod_name, mirrord_agent_name).await?;
+            // wait_for_agent_startup(&pod_api, &runtime_data.pod_name, mirrord_agent_name).await?;
         }
 
         container_progress.done_with("container is ready");
