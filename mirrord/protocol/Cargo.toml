@@ -28,6 +28,7 @@ fancy-regex = { workspace = true }
 libc.workspace = true
 socket2.workspace = true
 semver.workspace = true
+paste = "1"
 
 mirrord-macros = { path = "../macros" }
 

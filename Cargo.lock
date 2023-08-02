@@ -3463,6 +3463,7 @@ dependencies = [
  "libc",
  "mirrord-macros",
  "nix 0.24.3",
+ "paste",
  "semver 1.0.18",
  "serde",
  "socket2 0.5.3",
