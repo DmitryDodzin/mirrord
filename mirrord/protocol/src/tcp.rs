@@ -1,27 +1,23 @@
 use core::fmt::Display;
-use std::{
-    collections::VecDeque,
-    convert::Infallible,
-    fmt,
-    net::IpAddr,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::{collections::VecDeque, convert::Infallible, fmt, net::IpAddr};
 
 use bincode::{Decode, Encode};
 use bytes::Bytes;
-use http_body_util::{combinators::BoxBody, BodyExt};
+use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
-    body::{Body, Frame, Incoming},
-    http,
-    http::response::Parts,
-    HeaderMap, Method, Request, Response, StatusCode, Uri, Version,
+    body::Incoming, http, http::response::Parts, HeaderMap, Method, Request, Response, StatusCode,
+    Uri, Version,
 };
 use mirrord_macros::protocol_break;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{ConnectionId, Port, RemoteResult, RequestId};
+use crate::{
+    features::{Features, RequireFeature},
+    ConnectionId, Port, RemoteResult, RequestId,
+};
+
+pub mod inner_http_body;
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct NewTcpConnection {
@@ -150,7 +146,12 @@ pub struct InternalHttpRequest {
     #[serde(with = "http_serde::version")]
     pub version: Version,
 
-    pub body: InternalHttpBody,
+    pub body: Vec<u8>,
+
+    pub frame_mapping: RequireFeature<
+        { Features::KeepHttpFrames.bits() },
+        VecDeque<inner_http_body::InternalHttpBodyFrame>,
+    >,
 }
 
 impl<E> From<InternalHttpRequest> for Request<BoxBody<Bytes, E>>
@@ -164,8 +165,17 @@ where
             headers,
             version,
             body,
+            frame_mapping,
         } = value;
-        let mut request = Request::new(BoxBody::new(body.map_err(|e| e.into())));
+
+        let body = match frame_mapping.into_inner() {
+            Some(frames) => BoxBody::new(
+                inner_http_body::InternalHttpBody::new(body, frames).map_err(|e| e.into()),
+            ),
+            None => BoxBody::new(Full::new(Bytes::from(body)).map_err(|e| e.into())),
+        };
+
+        let mut request = Request::new(body);
         *request.method_mut() = method;
         *request.uri_mut() = uri;
         *request.version_mut() = version;
@@ -209,91 +219,12 @@ pub struct InternalHttpResponse {
     #[serde(with = "http_serde::header_map")]
     headers: HeaderMap,
 
-    body: InternalHttpBody,
-}
+    body: Vec<u8>,
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone)]
-pub struct InternalHttpBody(VecDeque<InternalHttpBodyFrame>);
-
-impl InternalHttpBody {
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        InternalHttpBody(VecDeque::from([InternalHttpBodyFrame::Data(
-            bytes.to_vec(),
-        )]))
-    }
-
-    pub async fn from_body<B>(mut body: B) -> Result<Self, B::Error>
-    where
-        B: Body<Data = Bytes> + Unpin,
-    {
-        let mut frames = VecDeque::new();
-
-        while let Some(frame) = body.frame().await {
-            frames.push_back(frame?.into());
-        }
-
-        Ok(InternalHttpBody(frames))
-    }
-}
-
-impl Body for InternalHttpBody {
-    type Data = Bytes;
-
-    type Error = Infallible;
-
-    fn poll_frame(
-        mut self: Pin<&mut Self>,
-        _: &mut Context<'_>,
-    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        Poll::Ready(self.0.pop_front().map(Frame::from).map(Ok))
-    }
-
-    fn is_end_stream(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub enum InternalHttpBodyFrame {
-    Data(Vec<u8>),
-    Trailers(#[serde(with = "http_serde::header_map")] HeaderMap),
-}
-
-impl From<Frame<Bytes>> for InternalHttpBodyFrame {
-    fn from(frame: Frame<Bytes>) -> Self {
-        if frame.is_data() {
-            InternalHttpBodyFrame::Data(frame.into_data().expect("Malfromed data frame").to_vec())
-        } else if frame.is_trailers() {
-            InternalHttpBodyFrame::Trailers(
-                frame.into_trailers().expect("Malfromed trailers frame"),
-            )
-        } else {
-            panic!("Malfromed frame type")
-        }
-    }
-}
-
-impl From<InternalHttpBodyFrame> for Frame<Bytes> {
-    fn from(frame: InternalHttpBodyFrame) -> Self {
-        match frame {
-            InternalHttpBodyFrame::Data(data) => Frame::data(Bytes::from(data)),
-            InternalHttpBodyFrame::Trailers(map) => Frame::trailers(map),
-        }
-    }
-}
-
-impl fmt::Debug for InternalHttpBodyFrame {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            InternalHttpBodyFrame::Data(data) => f
-                .debug_tuple("Data")
-                .field(&format_args!("{} (length)", data.len()))
-                .finish(),
-            InternalHttpBodyFrame::Trailers(map) => {
-                f.debug_tuple("Trailers").field(&map.len()).finish()
-            }
-        }
-    }
+    frame_mapping: RequireFeature<
+        { Features::KeepHttpFrames.bits() },
+        VecDeque<inner_http_body::InternalHttpBodyFrame>,
+    >,
 }
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -328,13 +259,16 @@ impl HttpResponse {
             body,
         ) = response.into_parts();
 
-        let body = InternalHttpBody::from_body(body).await?;
+        let (body, frame_mapping) = inner_http_body::InternalHttpBody::from_body(body)
+            .await?
+            .unpack();
 
         let internal_response = InternalHttpResponse {
             status,
             headers,
             version,
-            body,
+            body: body.to_vec(),
+            frame_mapping: frame_mapping.into(),
         };
 
         Ok(HttpResponse {
@@ -353,15 +287,16 @@ impl HttpResponse {
             port,
         } = request;
 
-        let body = InternalHttpBody::from_bytes(
+        let (body, frame_mapping) = inner_http_body::InternalHttpBody::from_bytes(
             format!(
                 "{} {}\n{}\n",
                 status.as_str(),
                 status.canonical_reason().unwrap_or_default(),
                 message
             )
-            .as_bytes(),
-        );
+            .into_bytes(),
+        )
+        .unpack();
 
         Self {
             port,
@@ -371,7 +306,8 @@ impl HttpResponse {
                 status,
                 version,
                 headers: Default::default(),
-                body,
+                body: body.to_vec(),
+                frame_mapping: frame_mapping.into(),
             },
         }
     }
@@ -393,6 +329,7 @@ impl HttpResponse {
                 version,
                 headers: Default::default(),
                 body: Default::default(),
+                frame_mapping: RequireFeature(None),
             },
         }
     }
@@ -410,6 +347,7 @@ where
             version,
             headers,
             body,
+            frame_mapping,
         } = value;
 
         let mut builder = Response::builder().status(status).version(version);
@@ -417,6 +355,13 @@ where
             *h = headers;
         }
 
-        builder.body(BoxBody::new(body.map_err(|e| e.into())))
+        let body = match frame_mapping.into_inner() {
+            Some(frames) => BoxBody::new(
+                inner_http_body::InternalHttpBody::new(body, frames).map_err(|e| e.into()),
+            ),
+            None => BoxBody::new(Full::new(Bytes::from(body)).map_err(|e| e.into())),
+        };
+
+        builder.body(body)
     }
 }

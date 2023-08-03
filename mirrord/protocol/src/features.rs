@@ -15,7 +15,17 @@ thread_local!(
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct RequireFeature<const F: u32, T>(Option<T>);
+pub struct RequireFeature<const F: u32, T>(pub Option<T>);
+
+impl<const F: u32, T> RequireFeature<F, T> {
+    pub const fn required_features() -> Option<Features> {
+        Features::from_bits(F)
+    }
+
+    pub fn into_inner(self) -> Option<T> {
+        self.0
+    }
+}
 
 impl<const F: u32, T> Serialize for RequireFeature<F, T>
 where
@@ -26,7 +36,7 @@ where
         S: serde::ser::Serializer,
     {
         let allowed = PROTOCOL_FEATURES.with(|cell| {
-            Features::from_bits(F)
+            Self::required_features()
                 .map(|flags| *cell.borrow() & flags == flags)
                 .unwrap_or(false)
         });
@@ -48,7 +58,7 @@ where
         D: serde::de::Deserializer<'de>,
     {
         let allowed = PROTOCOL_FEATURES.with(|cell| {
-            Features::from_bits(F)
+            Self::required_features()
                 .map(|flags| *cell.borrow() & flags == flags)
                 .unwrap_or(false)
         });
@@ -58,6 +68,12 @@ where
         } else {
             Ok(RequireFeature(None))
         }
+    }
+}
+
+impl<const F: u32, T> From<T> for RequireFeature<F, T> {
+    fn from(value: T) -> Self {
+        RequireFeature(Some(value))
     }
 }
 
