@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use bitflags::bitflags;
+use bitflags_serde_shim::impl_serde_for_bitflags;
 use serde::{Deserialize, Serialize};
 
 bitflags! {
@@ -9,6 +10,8 @@ bitflags! {
         const KeepHttpFrames = 0b00000001;
     }
 }
+
+impl_serde_for_bitflags!(Features);
 
 thread_local!(
     static PROTOCOL_FEATURES: RefCell<Features> = RefCell::new(Features::empty())
