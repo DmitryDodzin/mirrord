@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use hyper::{body::Incoming, http::request, Request};
 use mirrord_protocol::{
     tcp::{
-        DaemonTcp, HttpRequest, HttpResponse, InternalHttpBody, InternalHttpRequest, StealType,
-        TcpData,
+        inner_http_body::InternalHttpBody, DaemonTcp, HttpRequest, HttpResponse,
+        InternalHttpRequest, StealType, TcpData,
     },
     ConnectionId, Port, RequestId,
 };
@@ -118,14 +118,15 @@ impl MatchedHttpRequest {
             body,
         ) = self.request.into_parts();
 
-        let body = InternalHttpBody::from_body(body).await?;
+        let (body, frame_mapping) = InternalHttpBody::from_body(body).await?.unpack();
 
         let internal_request = InternalHttpRequest {
             method,
             uri,
             headers,
             version,
-            body,
+            body: body.into(),
+            frame_mapping: frame_mapping.into(),
         };
 
         Ok(HttpRequest {
