@@ -6,22 +6,8 @@ use serde::{Deserialize, Serialize};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    pub struct Features: u32 { }
-}
-
-impl_serde_for_bitflags!(Features);
-
-impl fmt::Display for Features {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl FromStr for Features {
-    type Err = bitflags::parser::ParseError;
-
-    fn from_str(flags: &str) -> Result<Self, Self::Err> {
-        Ok(Self(flags.parse()?))
+    pub struct Features: u32 {
+        const KeepHttpFrames = 0b00000001;
     }
 }
 
