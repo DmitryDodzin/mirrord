@@ -169,13 +169,11 @@ where
         } = value;
 
         let body = match frame_mapping.into_inner() {
-            Some(frames) => BoxBody::new(
-                inner_http_body::InternalHttpBody::new(body, frames).map_err(|e| e.into()),
-            ),
-            None => BoxBody::new(Full::new(Bytes::from(body)).map_err(|e| e.into())),
+            Some(frames) => inner_http_body::InternalHttpBody::new(body, frames),
+            None => inner_http_body::InternalHttpBody::from_bytes(body),
         };
 
-        let mut request = Request::new(body);
+        let mut request = Request::new(BoxBody::new(body.map_err(|e| e.into())));
         *request.method_mut() = method;
         *request.uri_mut() = uri;
         *request.version_mut() = version;
