@@ -3329,7 +3329,7 @@ dependencies = [
  "mirrord-progress",
  "mirrord-protocol",
  "rand",
- "rstest 0.17.0",
+ "rstest 0.18.1",
  "serde",
  "serde_json",
  "shellexpand",
@@ -3374,7 +3374,7 @@ dependencies = [
  "os_info",
  "rand",
  "regex",
- "rstest 0.17.0",
+ "rstest 0.18.1",
  "serde_json",
  "socket2 0.5.3",
  "streammap-ext",
@@ -3455,7 +3455,7 @@ dependencies = [
 
 [[package]]
 name = "mirrord-protocol"
-version = "1.2.2"
+version = "1.3.0"
 dependencies = [
  "actix-codec",
  "bincode",
@@ -4926,6 +4926,9 @@ name = "semver"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"

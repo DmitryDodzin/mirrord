@@ -1,5 +1,6 @@
 #![feature(const_trait_impl)]
 #![feature(io_error_more)]
+#![feature(lazy_cell)]
 #![feature(result_option_inspect)]
 #![warn(clippy::indexing_slicing)]
 
@@ -10,6 +11,7 @@ pub mod file;
 pub mod outgoing;
 pub mod pause;
 pub mod tcp;
+pub mod version;
 
 use std::{collections::HashSet, ops::Deref};
 

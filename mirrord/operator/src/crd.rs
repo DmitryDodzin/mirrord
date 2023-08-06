@@ -110,4 +110,6 @@ pub struct LicenseInfoOwned {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
 pub enum OperatorFeatures {
     ProxyApi,
+    #[schemars(skip)]
+    ProtocolVersion(semver::Version),
 }
