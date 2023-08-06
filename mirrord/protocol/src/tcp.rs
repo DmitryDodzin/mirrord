@@ -1,18 +1,21 @@
 use core::fmt::Display;
-use std::{fmt, net::IpAddr};
+use std::{collections::VecDeque, convert::Infallible, fmt, net::IpAddr, sync::LazyLock};
 
 use bincode::{Decode, Encode};
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
+use http_body_util::{combinators::BoxBody, BodyExt, Full};
 use hyper::{
     body::Incoming, http, http::response::Parts, HeaderMap, Method, Request, Response, StatusCode,
     Uri, Version,
 };
 use mirrord_macros::protocol_break;
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{ConnectionId, Port, RemoteResult, RequestId};
+use crate::{version::VersionClamp, ConnectionId, Port, RemoteResult, RequestId};
+
+pub mod inner_http_body;
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct NewTcpConnection {
@@ -61,6 +64,14 @@ pub enum DaemonTcp {
     /// flakiness.
     SubscribeResult(RemoteResult<Port>),
     HttpRequest(HttpRequest),
+}
+
+impl VersionClamp for DaemonTcp {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if let DaemonTcp::HttpRequest(req) = self {
+            req.clamp_version(version);
+        }
+    }
 }
 
 /// Wraps the string that will become a [`fancy_regex::Regex`], providing a nice API in
@@ -126,8 +137,16 @@ pub enum LayerTcpSteal {
     HttpResponse(HttpResponse),
 }
 
+impl VersionClamp for LayerTcpSteal {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if let LayerTcpSteal::HttpResponse(res) = self {
+            res.clamp_version(version);
+        }
+    }
+}
+
 /// (De-)Serializable HTTP request.
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, Clone)]
 pub struct InternalHttpRequest {
     #[serde(with = "http_serde::method")]
     pub method: Method,
@@ -142,21 +161,14 @@ pub struct InternalHttpRequest {
     pub version: Version,
 
     pub body: Vec<u8>,
+
+    pub frame_mapping: Option<VecDeque<inner_http_body::InternalHttpBodyFrame>>,
 }
 
-impl fmt::Debug for InternalHttpRequest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InternalHttpRequest")
-            .field("method", &self.method)
-            .field("uri", &self.uri)
-            .field("headers", &self.headers)
-            .field("version", &self.version)
-            .field("body (length)", &self.body.len())
-            .finish()
-    }
-}
-
-impl From<InternalHttpRequest> for Request<Full<Bytes>> {
+impl<E> From<InternalHttpRequest> for Request<BoxBody<Bytes, E>>
+where
+    E: From<Infallible>,
+{
     fn from(value: InternalHttpRequest) -> Self {
         let InternalHttpRequest {
             method,
@@ -164,14 +176,63 @@ impl From<InternalHttpRequest> for Request<Full<Bytes>> {
             headers,
             version,
             body,
+            frame_mapping,
         } = value;
-        let mut request = Request::new(Full::new(Bytes::from(body)));
+
+        let body = match frame_mapping {
+            Some(frames) => inner_http_body::InternalHttpBody::new(body, frames),
+            None => inner_http_body::InternalHttpBody::from_bytes(body),
+        };
+
+        let mut request = Request::new(BoxBody::new(body.map_err(|e| e.into())));
         *request.method_mut() = method;
         *request.uri_mut() = uri;
         *request.version_mut() = version;
         *request.headers_mut() = headers;
 
         request
+    }
+}
+
+static FRAME_MAPPING_VERSION_REQUIREMT: LazyLock<VersionReq> =
+    LazyLock::new(|| VersionReq::parse(">=1.3.0").unwrap());
+
+impl VersionClamp for InternalHttpRequest {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if !FRAME_MAPPING_VERSION_REQUIREMT.matches(version) {
+            self.frame_mapping = None;
+        }
+    }
+}
+
+impl<E> TryFrom<InternalHttpResponse> for Response<BoxBody<Bytes, E>>
+where
+    E: From<Infallible>,
+{
+    type Error = http::Error;
+
+    fn try_from(value: InternalHttpResponse) -> Result<Self, Self::Error> {
+        let InternalHttpResponse {
+            status,
+            version,
+            headers,
+            body,
+            frame_mapping,
+        } = value;
+
+        let mut builder = Response::builder().status(status).version(version);
+        if let Some(h) = builder.headers_mut() {
+            *h = headers;
+        }
+
+        let body = match frame_mapping {
+            Some(frames) => BoxBody::new(
+                inner_http_body::InternalHttpBody::new(body, frames).map_err(|e| e.into()),
+            ),
+            None => BoxBody::new(Full::new(Bytes::from(body)).map_err(|e| e.into())),
+        };
+
+        builder.body(body)
     }
 }
 
@@ -195,6 +256,32 @@ impl HttpRequest {
     pub fn version(&self) -> Version {
         self.internal_request.version
     }
+
+    #[cfg(test)]
+    pub(crate) fn test_request() -> Self {
+        let (body, frame_mapping) =
+            inner_http_body::InternalHttpBody::from_bytes(b"Foobar".to_vec()).unpack();
+
+        HttpRequest {
+            connection_id: 1,
+            request_id: 1,
+            port: 80,
+            internal_request: InternalHttpRequest {
+                method: Method::GET,
+                version: Version::HTTP_2,
+                uri: "http://localhost".parse().unwrap(),
+                headers: Default::default(),
+                body: body.into(),
+                frame_mapping: Some(frame_mapping),
+            },
+        }
+    }
+}
+
+impl VersionClamp for HttpRequest {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        self.internal_request.clamp_version(version);
+    }
 }
 
 /// (De-)Serializable HTTP response.
@@ -210,6 +297,16 @@ pub struct InternalHttpResponse {
     headers: HeaderMap,
 
     body: Vec<u8>,
+
+    pub(crate) frame_mapping: Option<VecDeque<inner_http_body::InternalHttpBodyFrame>>,
+}
+
+impl VersionClamp for InternalHttpResponse {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if !FRAME_MAPPING_VERSION_REQUIREMT.matches(version) {
+            self.frame_mapping = None;
+        }
+    }
 }
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -244,12 +341,16 @@ impl HttpResponse {
             body,
         ) = response.into_parts();
 
-        let body = body.collect().await?.to_bytes().to_vec();
+        let (body, frame_mapping) = inner_http_body::InternalHttpBody::from_body(body)
+            .await?
+            .unpack();
+
         let internal_response = InternalHttpResponse {
             status,
             headers,
             version,
-            body,
+            body: body.to_vec(),
+            frame_mapping: frame_mapping.into(),
         };
 
         Ok(HttpResponse {
@@ -268,13 +369,16 @@ impl HttpResponse {
             port,
         } = request;
 
-        let body = format!(
-            "{} {}\n{}\n",
-            status.as_str(),
-            status.canonical_reason().unwrap_or_default(),
-            message
+        let (body, frame_mapping) = inner_http_body::InternalHttpBody::from_bytes(
+            format!(
+                "{} {}\n{}\n",
+                status.as_str(),
+                status.canonical_reason().unwrap_or_default(),
+                message
+            )
+            .into_bytes(),
         )
-        .into_bytes();
+        .unpack();
 
         Self {
             port,
@@ -284,7 +388,8 @@ impl HttpResponse {
                 status,
                 version,
                 headers: Default::default(),
-                body,
+                body: body.to_vec(),
+                frame_mapping: frame_mapping.into(),
             },
         }
     }
@@ -306,26 +411,33 @@ impl HttpResponse {
                 version,
                 headers: Default::default(),
                 body: Default::default(),
+                frame_mapping: None,
+            },
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_response() -> Self {
+        let (body, frame_mapping) =
+            inner_http_body::InternalHttpBody::from_bytes(b"Foobar".to_vec()).unpack();
+
+        HttpResponse {
+            connection_id: 1,
+            request_id: 1,
+            port: 80,
+            internal_response: InternalHttpResponse {
+                status: StatusCode::OK,
+                version: Version::HTTP_2,
+                headers: Default::default(),
+                body: body.into(),
+                frame_mapping: Some(frame_mapping),
             },
         }
     }
 }
 
-impl TryFrom<InternalHttpResponse> for Response<Full<Bytes>> {
-    type Error = http::Error;
-
-    fn try_from(value: InternalHttpResponse) -> Result<Self, Self::Error> {
-        let InternalHttpResponse {
-            status,
-            version,
-            headers,
-            body,
-        } = value;
-
-        let mut builder = Response::builder().status(status).version(version);
-        if let Some(h) = builder.headers_mut() {
-            *h = headers;
-        }
-        builder.body(Full::new(Bytes::from(body)))
+impl VersionClamp for HttpResponse {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        self.internal_response.clamp_version(version);
     }
 }

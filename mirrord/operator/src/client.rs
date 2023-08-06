@@ -332,7 +332,7 @@ where
 
     async fn handle_client_message(&mut self, client_message: ClientMessage) -> Result<()> {
         let payload = bincode::encode_to_vec(
-            client_message.min_version(&self.version),
+            client_message.into_clamp_version(&self.version),
             bincode::config::standard(),
         )?;
 

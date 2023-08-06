@@ -98,7 +98,13 @@ pub enum ClientMessage {
     PauseTargetRequest(bool),
 }
 
-impl VersionClamp for ClientMessage {}
+impl VersionClamp for ClientMessage {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if let ClientMessage::TcpSteal(steal) = self {
+            steal.clamp_version(version);
+        }
+    }
+}
 
 /// Type alias for `Result`s that should be returned from mirrord-agent to mirrord-layer.
 pub type RemoteResult<T> = Result<T, ResponseError>;
@@ -137,7 +143,13 @@ pub enum DaemonMessage {
     PauseTarget(DaemonPauseTarget),
 }
 
-impl VersionClamp for DaemonMessage {}
+impl VersionClamp for DaemonMessage {
+    fn clamp_version(&mut self, version: &semver::Version) {
+        if let DaemonMessage::Tcp(daemon_tcp) | DaemonMessage::TcpSteal(daemon_tcp) = self {
+            daemon_tcp.clamp_version(version)
+        }
+    }
+}
 
 pub struct ClientCodec {
     version: Version,
@@ -146,11 +158,17 @@ pub struct ClientCodec {
 
 impl ClientCodec {
     pub fn new() -> Self {
-        ClientCodec {
-            config: bincode::config::standard(),
-            version: env!("CARGO_PKG_VERSION")
+        ClientCodec::with_version(
+            env!("CARGO_PKG_VERSION")
                 .parse()
                 .unwrap_or_else(|_| Version::new(0, 0, 0)),
+        )
+    }
+
+    pub fn with_version(version: Version) -> Self {
+        ClientCodec {
+            config: bincode::config::standard(),
+            version,
         }
     }
 }
@@ -181,12 +199,13 @@ impl Encoder<ClientMessage> for ClientCodec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: ClientMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let encoded = match bincode::encode_to_vec(msg.min_version(&self.version), self.config) {
-            Ok(encoded) => encoded,
-            Err(err) => {
-                return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-            }
-        };
+        let encoded =
+            match bincode::encode_to_vec(msg.into_clamp_version(&self.version), self.config) {
+                Ok(encoded) => encoded,
+                Err(err) => {
+                    return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+                }
+            };
         dst.reserve(encoded.len());
         dst.put(&encoded[..]);
 
@@ -201,11 +220,17 @@ pub struct DaemonCodec {
 
 impl DaemonCodec {
     pub fn new() -> Self {
-        DaemonCodec {
-            config: bincode::config::standard(),
-            version: env!("CARGO_PKG_VERSION")
+        DaemonCodec::with_version(
+            env!("CARGO_PKG_VERSION")
                 .parse()
                 .unwrap_or_else(|_| Version::new(0, 0, 0)),
+        )
+    }
+
+    pub fn with_version(version: Version) -> Self {
+        DaemonCodec {
+            config: bincode::config::standard(),
+            version,
         }
     }
 }
@@ -236,12 +261,13 @@ impl Encoder<DaemonMessage> for DaemonCodec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: DaemonMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let encoded = match bincode::encode_to_vec(msg.min_version(&self.version), self.config) {
-            Ok(encoded) => encoded,
-            Err(err) => {
-                return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-            }
-        };
+        let encoded =
+            match bincode::encode_to_vec(msg.into_clamp_version(&self.version), self.config) {
+                Ok(encoded) => encoded,
+                Err(err) => {
+                    return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+                }
+            };
         dst.reserve(encoded.len());
         dst.put(&encoded[..]);
 
@@ -254,7 +280,9 @@ mod tests {
     use bytes::BytesMut;
 
     use super::*;
-    use crate::tcp::TcpData;
+    use crate::tcp::{
+        HttpRequest, HttpResponse, InternalHttpRequest, InternalHttpResponse, TcpData,
+    };
 
     #[test]
     fn sanity_client_encode_decode() {
@@ -324,5 +352,60 @@ mod tests {
             Ok(_) => panic!("Should have failed"),
             Err(err) => assert_eq!(err.kind(), io::ErrorKind::Other),
         }
+    }
+
+    #[test]
+    fn version_sanity_client_encode_decode() -> Result<(), Box<dyn std::error::Error>> {
+        let mut client_codec = ClientCodec::with_version("1.2.1".parse()?);
+        let mut daemon_codec = DaemonCodec::with_version("1.2.1".parse()?);
+        let mut buf = BytesMut::new();
+
+        let msg =
+            ClientMessage::TcpSteal(LayerTcpSteal::HttpResponse(HttpResponse::test_response()));
+
+        client_codec.encode(msg, &mut buf)?;
+
+        let decoded = daemon_codec.decode(&mut buf)?.unwrap();
+
+        assert!(matches!(
+            decoded,
+            ClientMessage::TcpSteal(LayerTcpSteal::HttpResponse(HttpResponse {
+                internal_response: InternalHttpResponse {
+                    frame_mapping: None,
+                    ..
+                },
+                ..
+            }))
+        ));
+        assert!(buf.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn version_sanity_daemon_encode_decode() -> Result<(), Box<dyn std::error::Error>> {
+        let mut client_codec = ClientCodec::with_version("1.2.1".parse()?);
+        let mut daemon_codec = DaemonCodec::with_version("1.2.1".parse()?);
+        let mut buf = BytesMut::new();
+
+        let msg = DaemonMessage::Tcp(DaemonTcp::HttpRequest(HttpRequest::test_request()));
+
+        daemon_codec.encode(msg, &mut buf)?;
+
+        let decoded = client_codec.decode(&mut buf)?.unwrap();
+
+        assert!(matches!(
+            decoded,
+            DaemonMessage::Tcp(DaemonTcp::HttpRequest(HttpRequest {
+                internal_request: InternalHttpRequest {
+                    frame_mapping: None,
+                    ..
+                },
+                ..
+            }))
+        ));
+        assert!(buf.is_empty());
+
+        Ok(())
     }
 }
