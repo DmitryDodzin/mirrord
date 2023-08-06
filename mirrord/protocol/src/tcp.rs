@@ -12,7 +12,7 @@ use mirrord_macros::protocol_break;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{ConnectionId, Port, RemoteResult, RequestId};
+use crate::{version::VersionClamp, ConnectionId, Port, RemoteResult, RequestId};
 
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct NewTcpConnection {

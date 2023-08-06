@@ -11,7 +11,7 @@ use mirrord_kube::{
     error::KubeApiError,
 };
 use mirrord_progress::{MessageKind, Progress};
-use mirrord_protocol::{ClientMessage, DaemonMessage};
+use mirrord_protocol::{version::VersionClamp as _, ClientMessage, DaemonMessage};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -68,12 +68,14 @@ pub struct OperatorSessionInformation {
     pub target: TargetCrd,
     pub fingerprint: Option<String>,
     pub operator_features: Vec<OperatorFeatures>,
+    pub operator_version: Version,
 }
 
 impl OperatorSessionInformation {
     pub fn new(
         target: TargetCrd,
         fingerprint: Option<String>,
+        operator_version: Version,
         operator_features: Vec<OperatorFeatures>,
     ) -> Self {
         Self {
@@ -81,6 +83,7 @@ impl OperatorSessionInformation {
             target,
             fingerprint,
             operator_features,
+            operator_version,
         }
     }
 
@@ -142,6 +145,7 @@ impl OperatorApi {
             let operator_session_information = OperatorSessionInformation::new(
                 target,
                 status.spec.license.fingerprint,
+                operator_version,
                 status.spec.features.unwrap_or_default(),
             );
 
@@ -284,11 +288,15 @@ impl OperatorApi {
             .await
             .map_err(KubeApiError::from)?;
 
-        Ok(ConnectionWrapper::wrap(connection))
+        Ok(ConnectionWrapper::wrap(
+            connection,
+            session_information.operator_version.clone(),
+        ))
     }
 }
 
 pub struct ConnectionWrapper<T> {
+    version: Version,
     connection: T,
     client_rx: Receiver<ClientMessage>,
     daemon_tx: Sender<DaemonMessage>,
@@ -302,11 +310,12 @@ where
         + Unpin
         + 'stream,
 {
-    fn wrap(connection: T) -> (Sender<ClientMessage>, Receiver<DaemonMessage>) {
+    fn wrap(connection: T, version: Version) -> (Sender<ClientMessage>, Receiver<DaemonMessage>) {
         let (client_tx, client_rx) = mpsc::channel(CONNECTION_CHANNEL_SIZE);
         let (daemon_tx, daemon_rx) = mpsc::channel(CONNECTION_CHANNEL_SIZE);
 
         let connection_wrapper = ConnectionWrapper {
+            version,
             connection,
             client_rx,
             daemon_tx,
@@ -322,7 +331,10 @@ where
     }
 
     async fn handle_client_message(&mut self, client_message: ClientMessage) -> Result<()> {
-        let payload = bincode::encode_to_vec(client_message, bincode::config::standard())?;
+        let payload = bincode::encode_to_vec(
+            client_message.min_version(&self.version),
+            bincode::config::standard(),
+        )?;
 
         self.connection.send(payload.into()).await?;
 

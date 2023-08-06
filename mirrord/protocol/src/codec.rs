@@ -7,6 +7,7 @@ use actix_codec::{Decoder, Encoder};
 use bincode::{error::DecodeError, Decode, Encode};
 use bytes::{Buf, BufMut, BytesMut};
 use mirrord_macros::protocol_break;
+use semver::Version;
 
 use crate::{
     dns::{GetAddrInfoRequest, GetAddrInfoResponse},
@@ -24,6 +25,7 @@ use crate::{
     },
     pause::DaemonPauseTarget,
     tcp::{DaemonTcp, LayerTcp, LayerTcpSteal},
+    version::VersionClamp,
     ResponseError,
 };
 
@@ -96,6 +98,8 @@ pub enum ClientMessage {
     PauseTargetRequest(bool),
 }
 
+impl VersionClamp for ClientMessage {}
+
 /// Type alias for `Result`s that should be returned from mirrord-agent to mirrord-layer.
 pub type RemoteResult<T> = Result<T, ResponseError>;
 
@@ -133,7 +137,10 @@ pub enum DaemonMessage {
     PauseTarget(DaemonPauseTarget),
 }
 
+impl VersionClamp for DaemonMessage {}
+
 pub struct ClientCodec {
+    version: Version,
     config: bincode::config::Configuration,
 }
 
@@ -141,6 +148,9 @@ impl ClientCodec {
     pub fn new() -> Self {
         ClientCodec {
             config: bincode::config::standard(),
+            version: env!("CARGO_PKG_VERSION")
+                .parse()
+                .unwrap_or_else(|_| Version::new(0, 0, 0)),
         }
     }
 }
@@ -171,7 +181,7 @@ impl Encoder<ClientMessage> for ClientCodec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: ClientMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let encoded = match bincode::encode_to_vec(msg, self.config) {
+        let encoded = match bincode::encode_to_vec(msg.min_version(&self.version), self.config) {
             Ok(encoded) => encoded,
             Err(err) => {
                 return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
@@ -185,6 +195,7 @@ impl Encoder<ClientMessage> for ClientCodec {
 }
 
 pub struct DaemonCodec {
+    version: Version,
     config: bincode::config::Configuration,
 }
 
@@ -192,6 +203,9 @@ impl DaemonCodec {
     pub fn new() -> Self {
         DaemonCodec {
             config: bincode::config::standard(),
+            version: env!("CARGO_PKG_VERSION")
+                .parse()
+                .unwrap_or_else(|_| Version::new(0, 0, 0)),
         }
     }
 }
@@ -222,7 +236,7 @@ impl Encoder<DaemonMessage> for DaemonCodec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: DaemonMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let encoded = match bincode::encode_to_vec(msg, self.config) {
+        let encoded = match bincode::encode_to_vec(msg.min_version(&self.version), self.config) {
             Ok(encoded) => encoded,
             Err(err) => {
                 return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));

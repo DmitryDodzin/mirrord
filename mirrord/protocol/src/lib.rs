@@ -10,6 +10,7 @@ pub mod file;
 pub mod outgoing;
 pub mod pause;
 pub mod tcp;
+pub mod version;
 
 use std::{collections::HashSet, ops::Deref};
 
