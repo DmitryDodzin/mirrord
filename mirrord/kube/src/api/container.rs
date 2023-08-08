@@ -279,6 +279,13 @@ impl ContainerApi for JobContainer {
                                         "cpu": "100m",
                                         "memory": "100Mi"
                                     },
+                                },
+                                "readinessProbe": {
+                                    "exec": {
+                                        "command": ["cat", "/tmp/healthy"]
+                                    },
+                                    "initialDelaySeconds": 2,
+                                    "periodSeconds": 2
                                 }
                             }
                         ]
@@ -311,11 +318,11 @@ impl ContainerApi for JobContainer {
 
         while let Some(Ok(pod)) = stream.next().await {
             if let Some(status) = &pod.status && let Some(phase) = &status.phase {
-                        debug!("Pod Phase = {phase:?}");
-                    if phase == "Running" {
-                        break;
-                    }
+                debug!("Pod Phase = {phase:?}");
+                if phase == "Running" {
+                    break;
                 }
+            }
         }
 
         let pods = pod_api
@@ -328,8 +335,6 @@ impl ContainerApi for JobContainer {
             .first()
             .and_then(|pod| pod.metadata.name.clone())
             .ok_or(KubeApiError::JobPodNotFound(mirrord_agent_job_name))?;
-
-        wait_for_agent_startup(&pod_api, &pod_name, "mirrord-agent".to_string()).await?;
 
         pod_progress.done_with("pod is ready");
 

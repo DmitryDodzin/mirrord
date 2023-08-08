@@ -562,6 +562,7 @@ async fn start_agent() -> Result<()> {
     // WARNING: This exact string is expected to be read in `pod_api.rs`, more specifically in
     // `wait_for_agent_startup`. If you change this then mirrord fails to initialize.
     println!("agent ready");
+    let _ = tokio::fs::write("/tmp/healthy", b"agent ready").await;
 
     let mut clients = FuturesUnordered::new();
 
@@ -639,6 +640,8 @@ async fn start_agent() -> Result<()> {
     if let Some(err) = bg_tasks.stealer_status.err().await {
         error!("start_agent -> stealer task failed with error: {}", err);
     }
+
+    let _ = tokio::fs::remove_file("/tmp/healthy").await;
 
     trace!("Agent shutdown.");
     Ok(())
