@@ -166,11 +166,11 @@ impl AgentManagment for KubernetesAPI {
     }
 }
 
-pub async fn create_kube_api<P>(
+pub async fn create_kube_api_config<P>(
     accept_invalid_certificates: bool,
     kubeconfig: Option<P>,
     kube_context: Option<String>,
-) -> Result<Client>
+) -> Result<Config>
 where
     P: AsRef<str>,
 {
@@ -192,5 +192,20 @@ where
         Config::infer().await?
     };
     config.accept_invalid_certs = accept_invalid_certificates;
+
+    Ok(config)
+}
+
+pub async fn create_kube_api<P>(
+    accept_invalid_certificates: bool,
+    kubeconfig: Option<P>,
+    kube_context: Option<String>,
+) -> Result<Client>
+where
+    P: AsRef<str>,
+{
+    let config =
+        create_kube_api_config(accept_invalid_certificates, kubeconfig, kube_context).await?;
+
     Client::try_from(config).map_err(KubeApiError::from)
 }

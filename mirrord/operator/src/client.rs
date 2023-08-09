@@ -1,13 +1,13 @@
 use base64::{engine::general_purpose, Engine as _};
 use futures::{SinkExt, StreamExt};
 use http::request::Request;
-use kube::{error::ErrorResponse, Api, Client, Resource};
+use kube::{client::ClientBuilder, error::ErrorResponse, Api, Client, Resource};
 use mirrord_auth::{credential_store::CredentialStoreSync, error::AuthenticationError};
 use mirrord_config::{
     feature::network::incoming::ConcurrentSteal, target::TargetConfig, LayerConfig,
 };
 use mirrord_kube::{
-    api::{get_k8s_resource_api, kubernetes::create_kube_api},
+    api::{get_k8s_resource_api, kubernetes::create_kube_api_config},
     error::KubeApiError,
 };
 use mirrord_progress::{MessageKind, Progress};
@@ -19,7 +19,12 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tracing::error;
 
-use crate::crd::{MirrordOperatorCrd, OperatorFeatures, TargetCrd, OPERATOR_STATUS_NAME};
+use crate::{
+    client::session::CustomHeadersLayer,
+    crd::{MirrordOperatorCrd, OperatorFeatures, TargetCrd, OPERATOR_STATUS_NAME},
+};
+
+mod session;
 
 static CONNECTION_CHANNEL_SIZE: usize = 1000;
 const MIRRORD_OPERATOR_SESSION: &str = "MIRRORD_OPERATOR_SESSION";
@@ -53,6 +58,7 @@ pub enum OperatorApiError {
 type Result<T, E = OperatorApiError> = std::result::Result<T, E>;
 
 pub struct OperatorApi {
+    session_id: String,
     client: Client,
     target_api: Api<TargetCrd>,
     target_namespace: Option<String>,
@@ -73,13 +79,14 @@ pub struct OperatorSessionInformation {
 
 impl OperatorSessionInformation {
     pub fn new(
+        session_id: String,
         target: TargetCrd,
         fingerprint: Option<String>,
         operator_features: Vec<OperatorFeatures>,
         protocol_version: Option<semver::Version>,
     ) -> Self {
         Self {
-            session_id: rand::random::<u64>().to_string(),
+            session_id,
             target,
             fingerprint,
             operator_features,
@@ -139,6 +146,7 @@ impl OperatorApi {
                 );
             }
             let operator_session_information = OperatorSessionInformation::new(
+                operator_api.session_id.clone(),
                 target,
                 status.spec.license.fingerprint,
                 status.spec.features.unwrap_or_default(),
@@ -170,15 +178,27 @@ impl OperatorApi {
     }
 
     async fn new(config: &LayerConfig) -> Result<Self> {
+        let session_id = rand::random::<u64>().to_string();
         let target_config = config.target.clone();
         let on_concurrent_steal = config.feature.network.incoming.on_concurrent_steal.clone();
 
-        let client = create_kube_api(
+        let kube_config = create_kube_api_config(
             config.accept_invalid_certificates,
             config.kubeconfig.clone(),
             config.kube_context.clone(),
         )
         .await?;
+
+        let custom_headers = CustomHeadersLayer::from_iter(
+            session::SessionId::new(&session_id)?
+                .into_iter()
+                .chain(session::Version),
+        );
+
+        let client = ClientBuilder::try_from(kube_config)
+            .map_err(KubeApiError::from)?
+            .with_layer(&custom_headers)
+            .build();
 
         let target_namespace = if target_config.path.is_some() {
             target_config.namespace.clone()
@@ -193,6 +213,7 @@ impl OperatorApi {
         let version_api: Api<MirrordOperatorCrd> = Api::all(client.clone());
 
         Ok(OperatorApi {
+            session_id,
             client,
             target_api,
             target_namespace,
@@ -267,9 +288,7 @@ impl OperatorApi {
             return Err(OperatorApiError::ConcurrentStealAbort);
         }
 
-        let mut builder = Request::builder()
-            .uri(self.connect_url(session_information))
-            .header("x-session-id", session_information.session_id.clone());
+        let mut builder = Request::builder().uri(self.connect_url(session_information));
 
         if let Some(credential_name) = &session_information.fingerprint {
             let client_credentials = CredentialStoreSync::get_client_certificate::<
