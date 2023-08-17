@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["LoadType"],"fn":["load_type","should_load"]};
+window.SIDEBAR_ITEMS = {"enum":["LoadType"],"static":["BUILD_TOOL_PROCESSES","CALLSITE"],"struct":["ExecutableName"]};

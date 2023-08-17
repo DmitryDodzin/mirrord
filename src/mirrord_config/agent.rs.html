@@ -266,8 +266,35 @@
 <a href="#266" id="266">266</a>
 <a href="#267" id="267">267</a>
 <a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
+<span class="kw">use </span>k8s_openapi::api::core::v1::Toleration;
 <span class="kw">use </span>mirrord_analytics::CollectAnalytics;
 <span class="kw">use </span>mirrord_config_derive::MirrordConfig;
 <span class="kw">use </span>schemars::JsonSchema;
@@ -320,7 +347,7 @@
 /// ```
 </span><span class="attr">#[derive(MirrordConfig, Clone, Debug)]
 #[config(map_to = <span class="string">&quot;AgentFileConfig&quot;</span>, derive = <span class="string">&quot;JsonSchema&quot;</span>)]
-#[cfg_attr(test, config(derive = <span class="string">&quot;PartialEq, Eq&quot;</span>))]
+#[cfg_attr(test, config(derive = <span class="string">&quot;PartialEq&quot;</span>))]
 </span><span class="kw">pub struct </span>AgentConfig {
     <span class="doccomment">/// ### agent.log_level {#agent-log_level}
     ///
@@ -465,6 +492,31 @@
     /// If nothing is disabled here, agent uses `NET_ADMIN`, `NET_RAW`, `SYS_PTRACE` and
     /// `SYS_ADMIN`.
     </span><span class="kw">pub </span>disabled_capabilities: <span class="prelude-ty">Option</span>&lt;Vec&lt;LinuxCapability&gt;&gt;,
+
+    <span class="doccomment">/// ### agent.tolerations {#agent-tolerations}
+    ///
+    /// Set pod tolerations. (not with ephemeral agents)
+    /// Default is
+    /// ```json
+    /// [
+    ///   {
+    ///     &quot;operator&quot;: &quot;Exists&quot;
+    ///   }
+    /// ]
+    /// ```
+    ///
+    /// Set to an empty array to have no tolerations at all
+    </span><span class="kw">pub </span>tolerations: <span class="prelude-ty">Option</span>&lt;Vec&lt;Toleration&gt;&gt;,
+
+    <span class="doccomment">/// ### agent.check_out_of_pods {#agent-check_out_of_pods}
+    ///
+    /// Determine if to check whether there is room for agent job in target node. (Not applicable
+    /// when using ephemeral containers feature)
+    ///
+    /// Can be disabled if the check takes too long and you are sure there is enough resources on
+    /// each node
+    </span><span class="attr">#[config(default = <span class="bool-val">true</span>)]
+    </span><span class="kw">pub </span>check_out_of_pods: bool,
 
     <span class="doccomment">/// &lt;!--${internal}--&gt;
     /// Create an agent that returns an error after accepting the first client. For testing

@@ -728,6 +728,45 @@
 <a href="#728" id="728">728</a>
 <a href="#729" id="729">729</a>
 <a href="#730" id="730">730</a>
+<a href="#731" id="731">731</a>
+<a href="#732" id="732">732</a>
+<a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a>
 </pre></div><pre class="rust"><code><span class="attr">#![feature(slice_concat_trait)]
 #![feature(lazy_cell)]
 #![feature(result_option_inspect)]
@@ -741,6 +780,7 @@
 </span><span class="kw">pub mod </span>agent;
 <span class="kw">pub mod </span>config;
 <span class="kw">pub mod </span>feature;
+<span class="kw">pub mod </span>internal_proxy;
 <span class="kw">pub mod </span>target;
 <span class="kw">pub mod </span>util;
 
@@ -754,7 +794,7 @@
 
 <span class="kw">use crate</span>::{
     agent::AgentConfig, config::source::MirrordConfigSource, feature::FeatureConfig,
-    target::TargetConfig, util::VecOrSingle,
+    internal_proxy::InternalProxyConfig, target::TargetConfig, util::VecOrSingle,
 };
 
 <span class="kw">const </span>PAUSE_WITHOUT_STEAL_WARNING: <span class="kw-2">&amp;</span>str =
@@ -794,6 +834,8 @@
 ///
 /// ### Complete `config.json` {#root-complete}
 ///
+///  Don&#39;t use this example as a starting point, it&#39;s just here to show you all the available
+/// options.
 /// ```json
 /// {
 ///   &quot;accept_invalid_certificates&quot;: false,
@@ -821,7 +863,7 @@
 ///     &quot;env&quot;: {
 ///       &quot;include&quot;: &quot;DATABASE_USER;PUBLIC_ENV&quot;,
 ///       &quot;exclude&quot;: &quot;DATABASE_PASSWORD;SECRET_ENV&quot;,
-///       &quot;overrides&quot;: {
+///       &quot;override&quot;: {
 ///         &quot;DATABASE_CONNECTION&quot;: &quot;db://localhost:7777/my-db&quot;,
 ///         &quot;LOCAL_BEAR&quot;: &quot;panda&quot;
 ///       }
@@ -858,14 +900,15 @@
 ///   &quot;operator&quot;: true,
 ///   &quot;kubeconfig&quot;: &quot;~/.kube/config&quot;,
 ///   &quot;sip_binaries&quot;: &quot;bash&quot;,
-///   &quot;telemetry&quot;: true
+///   &quot;telemetry&quot;: true,
+///   &quot;kube_context&quot;: &quot;my-cluster&quot;
 /// }
 /// ```
 ///
 /// # Options {#root-options}
 </span><span class="attr">#[derive(MirrordConfig, Clone, Debug)]
 #[config(map_to = <span class="string">&quot;LayerFileConfig&quot;</span>, derive = <span class="string">&quot;JsonSchema&quot;</span>)]
-#[cfg_attr(test, config(derive = <span class="string">&quot;PartialEq, Eq&quot;</span>))]
+#[cfg_attr(test, config(derive = <span class="string">&quot;PartialEq&quot;</span>))]
 </span><span class="kw">pub struct </span>LayerConfig {
     <span class="doccomment">/// ## accept_invalid_certificates {#root-accept_invalid_certificates}
     ///
@@ -891,6 +934,19 @@
     /// ```
     </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_SKIP_PROCESSES&quot;</span>)]
     </span><span class="kw">pub </span>skip_processes: <span class="prelude-ty">Option</span>&lt;VecOrSingle&lt;String&gt;&gt;,
+
+    <span class="doccomment">/// ## skip_build_tools {#root-skip_build_tools}
+    ///
+    /// Allows mirrord to skip build tools. Useful when running command lines that build and run
+    /// the application in a single command.
+    ///
+    /// Defaults to `true`.
+    ///
+    /// Build-Tools: `[&quot;as&quot;, &quot;cc&quot;, &quot;ld&quot;, &quot;go&quot;, &quot;air&quot;, &quot;asm&quot;, &quot;cc1&quot;, &quot;cgo&quot;, &quot;dlv&quot;, &quot;gcc&quot;, &quot;git&quot;,
+    /// &quot;link&quot;, &quot;math&quot;, &quot;cargo&quot;, &quot;hpack&quot;, &quot;rustc&quot;, &quot;compile&quot;, &quot;collect2&quot;, &quot;cargo-watch&quot;,
+    /// &quot;debugserver&quot;]`
+    </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_SKIP_BUILD_TOOLS&quot;</span>, default = <span class="bool-val">true</span>)]
+    </span><span class="kw">pub </span>skip_build_tools: bool,
 
     <span class="doccomment">/// ## pause {#root-pause}
     /// Controls target pause feature. Unstable.
@@ -1004,6 +1060,23 @@
     /// [For more information](https://github.com/metalbear-co/mirrord/blob/main/TELEMETRY.md)
     </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_TELEMETRY&quot;</span>, default = <span class="bool-val">true</span>)]
     </span><span class="kw">pub </span>telemetry: bool,
+
+    <span class="doccomment">/// ## kube_context {#root-kube_context}
+    ///
+    /// Kube context to use from the kubeconfig file.
+    /// Will use current context if not specified.
+    ///
+    /// ```json
+    /// {
+    ///  &quot;kube_context&quot;: &quot;mycluster&quot;
+    /// }
+    /// ```
+    </span><span class="attr">#[config(env = <span class="string">&quot;MIRRORD_KUBE_CONTEXT&quot;</span>)]
+    </span><span class="kw">pub </span>kube_context: <span class="prelude-ty">Option</span>&lt;String&gt;,
+
+    <span class="doccomment">/// # internal_proxy {#root-internal_proxy}
+    </span><span class="attr">#[config(nested)]
+    </span><span class="kw">pub </span>internal_proxy: InternalProxyConfig,
 }
 
 <span class="kw">impl </span>LayerConfig {
@@ -1320,6 +1393,7 @@
                 namespace: <span class="prelude-val">Some</span>(<span class="string">&quot;default&quot;</span>.to_owned()),
             }),
             skip_processes: <span class="prelude-val">None</span>,
+            skip_build_tools: <span class="prelude-val">None</span>,
             agent: <span class="prelude-val">Some</span>(AgentFileConfig {
                 log_level: <span class="prelude-val">Some</span>(<span class="string">&quot;info&quot;</span>.to_owned()),
                 namespace: <span class="prelude-val">Some</span>(<span class="string">&quot;default&quot;</span>.to_owned()),
@@ -1336,6 +1410,8 @@
                 network_interface: <span class="prelude-val">None</span>,
                 flush_connections: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
                 disabled_capabilities: <span class="prelude-val">None</span>,
+                tolerations: <span class="prelude-val">None</span>,
+                check_out_of_pods: <span class="prelude-val">None</span>,
             }),
             feature: <span class="prelude-val">Some</span>(FeatureFileConfig {
                 env: ToggleableConfig::Enabled(<span class="bool-val">true</span>).into(),
@@ -1364,6 +1440,8 @@
             connect_tcp: <span class="prelude-val">None</span>,
             operator: <span class="prelude-val">None</span>,
             sip_binaries: <span class="prelude-val">None</span>,
+            kube_context: <span class="prelude-val">None</span>,
+            internal_proxy: <span class="prelude-val">None</span>,
         };
 
         <span class="macro">assert_eq!</span>(config, expect);

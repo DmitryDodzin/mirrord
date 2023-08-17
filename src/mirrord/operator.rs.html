@@ -174,6 +174,10 @@
 <a href="#174" id="174">174</a>
 <a href="#175" id="175">175</a>
 <a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{fs::File, path::PathBuf, time::Duration};
 
 <span class="kw">use </span>kube::Api;
@@ -184,7 +188,7 @@
     crd::{LicenseInfoOwned, MirrordOperatorCrd, MirrordOperatorSpec, OPERATOR_STATUS_NAME},
     setup::{LicenseType, Operator, OperatorNamespace, OperatorSetup, SetupOptions},
 };
-<span class="kw">use </span>mirrord_progress::{Progress, TaskProgress};
+<span class="kw">use </span>mirrord_progress::{Progress, ProgressTracker};
 <span class="kw">use </span>prettytable::{row, Table};
 <span class="kw">use </span>tokio::fs;
 <span class="kw">use </span>tracing::warn;
@@ -248,9 +252,13 @@
 <span class="kw">async fn </span>get_status_api(config: <span class="prelude-ty">Option</span>&lt;String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Api&lt;MirrordOperatorCrd&gt;&gt; {
     <span class="kw">let </span>kube_api = <span class="kw">if let </span><span class="prelude-val">Some</span>(config_path) = config {
         <span class="kw">let </span>config = LayerFileConfig::from_path(config_path)<span class="question-mark">?</span>.generate_config()<span class="question-mark">?</span>;
-        create_kube_api(config.accept_invalid_certificates, config.kubeconfig)
+        create_kube_api(
+            config.accept_invalid_certificates,
+            config.kubeconfig,
+            config.kube_context,
+        )
     } <span class="kw">else </span>{
-        create_kube_api(<span class="bool-val">false</span>, <span class="prelude-val">None</span>)
+        create_kube_api(<span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
     }
     .<span class="kw">await
     </span>.map_err(CliError::KubernetesApiFailed)<span class="question-mark">?</span>;
@@ -259,11 +267,11 @@
 }
 
 <span class="kw">async fn </span>operator_status(config: <span class="prelude-ty">Option</span>&lt;String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span>progress = TaskProgress::new(<span class="string">&quot;Operator Status&quot;</span>).fail_on_drop(<span class="bool-val">true</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>progress = ProgressTracker::from_env(<span class="string">&quot;Operator Status&quot;</span>);
 
     <span class="kw">let </span>status_api = get_status_api(config).<span class="kw">await</span><span class="question-mark">?</span>;
 
-    <span class="kw">let </span>status_progress = progress.subtask(<span class="string">&quot;fetching status&quot;</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>status_progress = progress.subtask(<span class="string">&quot;fetching status&quot;</span>);
 
     <span class="kw">let </span>mirrord_status = <span class="kw">match </span>status_api
         .get(OPERATOR_STATUS_NAME)
@@ -274,15 +282,15 @@
     {
         <span class="prelude-val">Ok</span>(status) =&gt; status,
         <span class="prelude-val">Err</span>(err) =&gt; {
-            status_progress.fail_with(<span class="string">&quot;unable to get status&quot;</span>);
+            status_progress.failure(<span class="prelude-val">Some</span>(<span class="string">&quot;unable to get status&quot;</span>));
 
             <span class="kw">return </span><span class="prelude-val">Err</span>(err);
         }
     };
 
-    status_progress.done_with(<span class="string">&quot;fetched status&quot;</span>);
+    status_progress.success(<span class="prelude-val">Some</span>(<span class="string">&quot;fetched status&quot;</span>));
 
-    progress.done();
+    progress.success(<span class="prelude-val">None</span>);
 
     <span class="kw">let </span>MirrordOperatorSpec {
         operator_version,

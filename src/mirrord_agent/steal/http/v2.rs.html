@@ -154,26 +154,28 @@
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
 <a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Holds the implementation of [`Service`] for [`HyperHandler`] (HTTP/2).
 //!
 //! # [`HttpV2`]
 //!
 //! Handles HTTP/2 requests.
 </span><span class="kw">use </span>core::{fmt::Debug, future::Future, pin::Pin};
-<span class="kw">use </span>std::{net::SocketAddr, sync::Arc};
+<span class="kw">use </span>std::{
+    net::SocketAddr,
+    sync::{atomic::Ordering, Arc},
+};
 
-<span class="kw">use </span>bytes::Bytes;
 <span class="kw">use </span>dashmap::DashMap;
 <span class="kw">use </span>futures::TryFutureExt;
-<span class="kw">use </span>http_body_util::Full;
+<span class="kw">use </span>http_body_util::{combinators::BoxBody, BodyExt};
 <span class="kw">use </span>hyper::{
     body::Incoming,
     client::{<span class="self">self</span>, conn::http2::SendRequest},
     server::conn::http2,
     service::Service,
-    Request, Response,
+    Request,
 };
+<span class="kw">use </span>hyper_util::rt::TokioIo;
 <span class="kw">use </span>mirrord_protocol::{ConnectionId, Port};
 <span class="kw">use </span>tokio::{
     net::TcpStream,
@@ -183,8 +185,8 @@
 
 <span class="kw">use super</span>::{
     filter::{close_connection, HttpFilter, TokioExecutor},
-    hyper_handler::{collect_response, prepare_response, HyperHandler},
-    DefaultReversibleStream, HttpV, RawHyperConnection,
+    hyper_handler::HyperHandler,
+    DefaultReversibleStream, HttpV, RawHyperConnection, Response,
 };
 <span class="kw">use crate</span>::{
     steal::{http::error::HttpTrafficError, HandlerHttpRequest},
@@ -210,7 +212,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), HttpTrafficError&gt; {
         http2::Builder::new(TokioExecutor::default())
             .serve_connection(
-                stream,
+                TokioIo::new(stream),
                 HyperHandler::&lt;HttpV2&gt;::new(
                     filters,
                     matched_tx,
@@ -230,7 +232,7 @@
         <span class="kw">_</span>: <span class="prelude-ty">Option</span>&lt;oneshot::Sender&lt;RawHyperConnection&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Sender, HttpTrafficError&gt; {
         <span class="kw">let </span>(request_sender, connection) =
-            client::conn::http2::handshake(TokioExecutor::default(), target_stream)
+            client::conn::http2::handshake(TokioExecutor::default(), TokioIo::new(target_stream))
                 .<span class="kw">await
                 </span>.inspect_err(|fail| <span class="macro">error!</span>(<span class="string">&quot;Handshake failed with {fail:#?}&quot;</span>))<span class="question-mark">?</span>;
 
@@ -248,18 +250,14 @@
     </span><span class="kw">async fn </span>send_request(
         sender: <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Sender,
         request: Request&lt;Incoming&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Response&lt;Full&lt;Bytes&gt;&gt;, HttpTrafficError&gt; {
-        <span class="comment">// Send the request to the original destination.
-        </span>prepare_response(
-            sender
-                .send_request(request)
-                .inspect_err(|fail| <span class="macro">error!</span>(<span class="string">&quot;Failed hyper request sender with {fail:#?}&quot;</span>))
-                .map_err(HttpTrafficError::from)
-                .and_then(collect_response)
-                .<span class="kw">await</span><span class="question-mark">?</span>,
-        )
-        .<span class="kw">await
-    </span>}
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Response, HttpTrafficError&gt; {
+        sender
+            .send_request(request)
+            .inspect_err(|fail| <span class="macro">error!</span>(<span class="string">&quot;Failed hyper request sender with {fail:#?}&quot;</span>))
+            .map_err(HttpTrafficError::from)
+            .<span class="kw">await
+            </span>.map(|response| response.map(|body| BoxBody::new(body.map_err(HttpTrafficError::from))))
+    }
 
     <span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>)]
     </span><span class="kw">fn </span>is_upgrade(<span class="kw">_</span>: <span class="kw-2">&amp;</span>Request&lt;Incoming&gt;) -&gt; bool {
@@ -283,22 +281,22 @@
             connection_id,
             port,
             original_destination,
-            request_id: <span class="number">0</span>,
+            next_request_id: Default::default(),
             handle_version: HttpV2,
         }
     }
 }
 
 <span class="kw">impl </span>Service&lt;Request&lt;Incoming&gt;&gt; <span class="kw">for </span>HyperHandler&lt;HttpV2&gt; {
-    <span class="kw">type </span>Response = Response&lt;Full&lt;Bytes&gt;&gt;;
+    <span class="kw">type </span>Response = Response;
 
     <span class="kw">type </span>Error = HttpTrafficError;
 
     <span class="kw">type </span>Future = Pin&lt;Box&lt;<span class="kw">dyn </span>Future&lt;Output = <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Response, <span class="self">Self</span>::Error&gt;&gt; + Send&gt;&gt;;
 
     <span class="attr">#[tracing::instrument(level = <span class="string">&quot;trace&quot;</span>, skip(<span class="self">self</span>))]
-    </span><span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, request: Request&lt;Incoming&gt;) -&gt; <span class="self">Self</span>::Future {
-        <span class="self">self</span>.request_id += <span class="number">1</span>;
+    </span><span class="kw">fn </span>call(<span class="kw-2">&amp;</span><span class="self">self</span>, request: Request&lt;Incoming&gt;) -&gt; <span class="self">Self</span>::Future {
+        <span class="kw">let </span>request_id = <span class="self">self</span>.next_request_id.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
 
         Box::pin(HyperHandler::&lt;HttpV2&gt;::handle_request(
             request,
@@ -307,7 +305,7 @@
             <span class="self">self</span>.filters.clone(),
             <span class="self">self</span>.port,
             <span class="self">self</span>.connection_id,
-            <span class="self">self</span>.request_id,
+            request_id,
             <span class="self">self</span>.matched_tx.clone(),
         ))
     }
