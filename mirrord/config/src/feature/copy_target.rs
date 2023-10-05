@@ -13,6 +13,9 @@ pub struct CopyTargetConfig {
     #[config(env = "MIRRORD_COPY_TARGET_ENABLED", default = false)]
     pub enabled: bool,
 
+    #[config(env = "MIRRORD_COPY_TARGET_REPLACE", default = false)]
+    pub replace: bool,
+
     #[config(env = "MIRRORD_COPY_TARGET_NAME")]
     pub name: Option<String>,
 }
@@ -24,10 +27,19 @@ impl MirrordToggleableConfig for CopyTargetFileConfig {
             .transpose()?
             .unwrap_or(false);
 
+        let replace = FromEnv::new("MIRRORD_COPY_TARGET_REPLACE")
+            .source_value(context)
+            .transpose()?
+            .unwrap_or(false);
+
         let name = FromEnv::new("MIRRORD_COPY_TARGET_NAME")
             .source_value(context)
             .transpose()?;
 
-        Ok(CopyTargetConfig { enabled, name })
+        Ok(CopyTargetConfig {
+            enabled,
+            replace,
+            name,
+        })
     }
 }

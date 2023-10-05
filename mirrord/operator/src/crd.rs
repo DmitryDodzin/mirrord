@@ -134,5 +134,6 @@ pub enum OperatorFeatures {
     namespaced
 )]
 pub struct CopyTargetSpec {
+    pub replace: bool,
     pub target: Target,
 }

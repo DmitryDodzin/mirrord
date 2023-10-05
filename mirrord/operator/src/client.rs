@@ -7,7 +7,9 @@ use mirrord_auth::{
     certificate::Certificate, credential_store::CredentialStoreSync, error::AuthenticationError,
 };
 use mirrord_config::{
-    feature::network::incoming::ConcurrentSteal, target::TargetConfig, LayerConfig,
+    feature::{copy_target::CopyTargetConfig, network::incoming::ConcurrentSteal},
+    target::TargetConfig,
+    LayerConfig,
 };
 use mirrord_kube::{
     api::kubernetes::{create_kube_api, get_k8s_resource_api},
@@ -92,6 +94,7 @@ pub struct OperatorApi {
     target_namespace: Option<String>,
     version_api: Api<MirrordOperatorCrd>,
     target_config: TargetConfig,
+    copy_config: CopyTargetConfig,
     on_concurrent_steal: ConcurrentSteal,
 }
 
@@ -210,8 +213,13 @@ impl OperatorApi {
                 .await
                 .map_err(KubeApiError::from)?,
             None => {
-                let requested =
-                    CopyTargetCrd::new(&target.get_target_name(), CopyTargetSpec { target });
+                let requested = CopyTargetCrd::new(
+                    &target.get_target_name(),
+                    CopyTargetSpec {
+                        replace: self.copy_config.replace,
+                        target,
+                    },
+                );
 
                 self.copy_target_api
                     .create(&PostParams::default(), &requested)
@@ -310,6 +318,8 @@ impl OperatorApi {
 
         let version_api: Api<MirrordOperatorCrd> = Api::all(client.clone());
 
+        let copy_config = config.feature.copy_target.clone();
+
         Ok(OperatorApi {
             client,
             target_api,
@@ -317,6 +327,7 @@ impl OperatorApi {
             target_namespace,
             version_api,
             target_config,
+            copy_config,
             on_concurrent_steal,
         })
     }
