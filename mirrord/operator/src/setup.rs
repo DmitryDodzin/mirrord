@@ -424,6 +424,7 @@ impl OperatorRole {
                         "pods/log".to_owned(),
                         "pods/ephemeralcontainers".to_owned(),
                         "deployments".to_owned(),
+                        "deployments/scale".to_owned(),
                         "jobs".to_owned(),
                         "rollouts".to_owned(),
                     ]),
@@ -438,8 +439,11 @@ impl OperatorRole {
                 },
                 PolicyRule {
                     api_groups: Some(vec!["".to_owned()]),
-                    resources: Some(vec!["pods/ephemeralcontainers".to_owned()]),
-                    verbs: vec!["update".to_owned()],
+                    resources: Some(vec![
+                        "pods/ephemeralcontainers".to_owned(),
+                        "deployments/scale".to_owned(),
+                    ]),
+                    verbs: vec!["update".to_owned(), "patch".to_owned()],
                     ..Default::default()
                 },
                 PolicyRule {
