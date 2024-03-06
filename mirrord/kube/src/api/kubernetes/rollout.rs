@@ -10,6 +10,8 @@ use serde::Deserialize;
 pub struct Rollout {
     metadata: ObjectMeta,
     pub spec: serde_json::Value,
+    #[serde(default)]
+    pub status: serde_json::Value,
 }
 
 impl Rollout {
