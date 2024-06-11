@@ -89,6 +89,16 @@ pub(crate) static IPTABLE_STANDARD: LazyLock<String> = LazyLock::new(|| {
     })
 });
 
+pub(crate) static IPTABLE_MANGLE_ENV: &str = "MIRRORD_IPTABLE_MANGLE_NAME";
+pub(crate) static IPTABLE_MANGLE: LazyLock<String> = LazyLock::new(|| {
+    std::env::var(IPTABLE_MANGLE_ENV).unwrap_or_else(|_| {
+        format!(
+            "MIRRORD_MANGLE_{}",
+            Alphanumeric.sample_string(&mut rand::thread_rng(), 5)
+        )
+    })
+});
+
 pub static IPTABLE_INPUT_ENV: &str = "MIRRORD_IPTABLE_INPUT_NAME";
 pub static IPTABLE_INPUT: LazyLock<String> = LazyLock::new(|| {
     std::env::var(IPTABLE_INPUT_ENV).unwrap_or_else(|_| {
@@ -242,7 +252,14 @@ where
     pub(super) async fn create(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
 
-        println!("{:?}", MeshVendor::detect(&ipt.with_table("filter")));
+        let mangle = MeshVendor::detect(&ipt.with_table("mangle"));
+
+        tracing::warn!(?mangle, "mangle table");
+
+        let mangle = mangle
+            .filter(|detected| matches!(detected, MeshVendor::Istio))
+            .map(|_| MangleRedirect::create(ipt.with_table("mangle"), IPTABLE_MANGLE))
+            .transpose()?;
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
             Redirects::Mesh(MeshRedirect::create(ipt.clone(), vendor)?)
@@ -262,16 +279,26 @@ where
                 Redirects::FlushConnections(FlushConnections::create(ipt, Box::new(redirect))?)
         }
 
+        if let Some(mangle) = mangle.as_ref() {
+            mangle.mount_entrypoint().await?;
+        }
+
         redirect.mount_entrypoint().await?;
 
-        Ok(Self {
-            redirect,
-            mangle: None,
-        })
+        Ok(Self { redirect, mangle })
     }
 
     pub(crate) async fn load(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
+
+        let mangle = MeshVendor::detect(&ipt.with_table("mangle"));
+
+        tracing::warn!(?mangle, "mangle table");
+
+        let mangle = mangle
+            .filter(|detected| matches!(detected, MeshVendor::Istio))
+            .map(|_| MangleRedirect::create(ipt.with_table("mangle"), IPTABLE_MANGLE))
+            .transpose()?;
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
             Redirects::Mesh(MeshRedirect::load(ipt.clone(), vendor)?)
@@ -290,10 +317,7 @@ where
             redirect = Redirects::FlushConnections(FlushConnections::load(ipt, Box::new(redirect))?)
         }
 
-        Ok(Self {
-            redirect,
-            mangle: None,
-        })
+        Ok(Self { redirect, mangle })
     }
 
     /// Adds the redirect rule to iptables.
@@ -305,6 +329,10 @@ where
         redirected_port: Port,
         target_port: Port,
     ) -> Result<()> {
+        if let Some(mangle) = self.mangle.as_ref() {
+            mangle.add_redirect(redirected_port, target_port).await?;
+        }
+
         self.redirect
             .add_redirect(redirected_port, target_port)
             .await
@@ -320,12 +348,20 @@ where
         redirected_port: Port,
         target_port: Port,
     ) -> Result<()> {
+        if let Some(mangle) = self.mangle.as_ref() {
+            mangle.remove_redirect(redirected_port, target_port).await?;
+        }
+
         self.redirect
             .remove_redirect(redirected_port, target_port)
             .await
     }
 
     pub(crate) async fn cleanup(&self) -> Result<()> {
+        if let Some(mangle) = self.mangle.as_ref() {
+            mangle.unmount_entrypoint().await?;
+        }
+
         self.redirect.unmount_entrypoint().await
     }
 }
