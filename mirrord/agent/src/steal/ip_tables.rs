@@ -12,6 +12,7 @@ use crate::{
     error::{AgentError, Result},
     steal::ip_tables::{
         flush_connections::FlushConnections,
+        mangle::MangleRedirect,
         mesh::{MeshRedirect, MeshVendorExt},
         prerouting::PreroutingRedirect,
         redirect::Redirect,
@@ -51,6 +52,7 @@ mod iptables {
 
 pub(crate) mod chain;
 pub(crate) mod flush_connections;
+pub(crate) mod mangle;
 pub(crate) mod mesh;
 pub(crate) mod output;
 pub(crate) mod prerouting;
@@ -224,6 +226,7 @@ pub(crate) enum Redirects<IPT: IPTables + Send + Sync> {
 
 /// Wrapper struct for IPTables so it flushes on drop.
 pub(crate) struct SafeIpTables<IPT: IPTables + Send + Sync> {
+    mangle: Option<MangleRedirect<IPT>>,
     redirect: Redirects<IPT>,
 }
 
@@ -238,6 +241,8 @@ where
 {
     pub(super) async fn create(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
+
+        println!("{:?}", MeshVendor::detect(&ipt.with_table("filter")));
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
             Redirects::Mesh(MeshRedirect::create(ipt.clone(), vendor)?)
@@ -259,7 +264,10 @@ where
 
         redirect.mount_entrypoint().await?;
 
-        Ok(Self { redirect })
+        Ok(Self {
+            redirect,
+            mangle: None,
+        })
     }
 
     pub(crate) async fn load(ipt: IPT, flush_connections: bool) -> Result<Self> {
@@ -282,7 +290,10 @@ where
             redirect = Redirects::FlushConnections(FlushConnections::load(ipt, Box::new(redirect))?)
         }
 
-        Ok(Self { redirect })
+        Ok(Self {
+            redirect,
+            mangle: None,
+        })
     }
 
     /// Adds the redirect rule to iptables.
