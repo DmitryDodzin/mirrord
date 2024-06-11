@@ -252,15 +252,14 @@ where
     pub(super) async fn create(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
 
-        let mangle = MeshVendor::detect(&ipt.with_table("mangle"))?;
+        let mangle_table = Arc::new(ipt.with_table("mangle"));
+        let mangle = MeshVendor::detect(mangle_table.as_ref())?;
 
         tracing::warn!(?mangle, "mangle table");
 
         let mangle = mangle
             .filter(|detected| matches!(detected, MeshVendor::Istio))
-            .map(|_| {
-                MangleRedirect::create(ipt.with_table("mangle").into(), IPTABLE_MANGLE.to_string())
-            })
+            .map(|_| MangleRedirect::create(mangle_table, IPTABLE_MANGLE.to_string()))
             .transpose()?;
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
@@ -293,15 +292,14 @@ where
     pub(crate) async fn load(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
 
-        let mangle = MeshVendor::detect(&ipt.with_table("mangle"))?;
+        let mangle_table = Arc::new(ipt.with_table("mangle"));
+        let mangle = MeshVendor::detect(mangle_table.as_ref())?;
 
         tracing::warn!(?mangle, "mangle table");
 
         let mangle = mangle
             .filter(|detected| matches!(detected, MeshVendor::Istio))
-            .map(|_| {
-                MangleRedirect::create(ipt.with_table("mangle").into(), IPTABLE_MANGLE.to_string())
-            })
+            .map(|_| MangleRedirect::create(mangle_table, IPTABLE_MANGLE.to_string()))
             .transpose()?;
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {

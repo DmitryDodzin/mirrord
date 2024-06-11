@@ -129,7 +129,7 @@ impl MeshVendorExt for MeshVendor {
         Ok(output.iter().find_map(|rule| {
             if rule.contains("-j PROXY_INIT_OUTPUT") {
                 Some(MeshVendor::Linkerd)
-            } else if rule.contains("-j ISTIO_PRERT") | rule.contains("-j ISTIO_OUTPUT") {
+            } else if rule.contains("-j ISTIO_OUTPUT") {
                 Some(MeshVendor::Istio)
             } else if rule.contains("-j KUMA_MESH_OUTBOUND") {
                 Some(MeshVendor::Kuma)
