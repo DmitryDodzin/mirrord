@@ -232,11 +232,11 @@ pub(crate) enum Redirects<IPT: IPTables + Send + Sync> {
     Mesh(MeshRedirect<IPT>),
     FlushConnections(FlushConnections<IPT, Redirects<IPT>>),
     PrerouteFallback(PreroutingRedirect<IPT>),
+    Mangle(MangleRedirect<IPT, Redirects<IPT>>),
 }
 
 /// Wrapper struct for IPTables so it flushes on drop.
 pub(crate) struct SafeIpTables<IPT: IPTables + Send + Sync> {
-    mangle: Option<MangleRedirect<IPT>>,
     redirect: Redirects<IPT>,
 }
 
@@ -252,16 +252,6 @@ where
     pub(super) async fn create(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
 
-        let mangle_table = Arc::new(ipt.with_table("mangle"));
-        let mangle = MeshVendor::detect(mangle_table.as_ref())?;
-
-        tracing::warn!(?mangle, "mangle table");
-
-        let mangle = mangle
-            .filter(|detected| matches!(detected, MeshVendor::Istio))
-            .map(|_| MangleRedirect::create(mangle_table, IPTABLE_MANGLE.to_string()))
-            .transpose()?;
-
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
             Redirects::Mesh(MeshRedirect::create(ipt.clone(), vendor)?)
         } else {
@@ -275,32 +265,25 @@ where
             }
         };
 
+        let mangle_ipt = Arc::new(ipt.with_table("mangle"));
+        let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
+
+        if matches!(mangle, Some(MeshVendor::Istio)) {
+            redirect = Redirects::Mangle(MangleRedirect::create(mangle_ipt, Box::new(redirect))?)
+        }
+
         if flush_connections {
             redirect =
                 Redirects::FlushConnections(FlushConnections::create(ipt, Box::new(redirect))?)
         }
 
-        if let Some(mangle) = mangle.as_ref() {
-            mangle.mount_entrypoint().await?;
-        }
-
         redirect.mount_entrypoint().await?;
 
-        Ok(Self { redirect, mangle })
+        Ok(Self { redirect })
     }
 
     pub(crate) async fn load(ipt: IPT, flush_connections: bool) -> Result<Self> {
         let ipt = Arc::new(ipt);
-
-        let mangle_table = Arc::new(ipt.with_table("mangle"));
-        let mangle = MeshVendor::detect(mangle_table.as_ref())?;
-
-        tracing::warn!(?mangle, "mangle table");
-
-        let mangle = mangle
-            .filter(|detected| matches!(detected, MeshVendor::Istio))
-            .map(|_| MangleRedirect::create(mangle_table, IPTABLE_MANGLE.to_string()))
-            .transpose()?;
 
         let mut redirect = if let Some(vendor) = MeshVendor::detect(ipt.as_ref())? {
             Redirects::Mesh(MeshRedirect::load(ipt.clone(), vendor)?)
@@ -315,11 +298,18 @@ where
             }
         };
 
+        let mangle_ipt = Arc::new(ipt.with_table("mangle"));
+        let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
+
+        if matches!(mangle, Some(MeshVendor::Istio)) {
+            redirect = Redirects::Mangle(MangleRedirect::load(mangle_ipt, Box::new(redirect))?)
+        }
+
         if flush_connections {
             redirect = Redirects::FlushConnections(FlushConnections::load(ipt, Box::new(redirect))?)
         }
 
-        Ok(Self { redirect, mangle })
+        Ok(Self { redirect })
     }
 
     /// Adds the redirect rule to iptables.
@@ -331,10 +321,6 @@ where
         redirected_port: Port,
         target_port: Port,
     ) -> Result<()> {
-        if let Some(mangle) = self.mangle.as_ref() {
-            mangle.add_redirect(redirected_port, target_port).await?;
-        }
-
         self.redirect
             .add_redirect(redirected_port, target_port)
             .await
@@ -350,20 +336,12 @@ where
         redirected_port: Port,
         target_port: Port,
     ) -> Result<()> {
-        if let Some(mangle) = self.mangle.as_ref() {
-            mangle.remove_redirect(redirected_port, target_port).await?;
-        }
-
         self.redirect
             .remove_redirect(redirected_port, target_port)
             .await
     }
 
     pub(crate) async fn cleanup(&self) -> Result<()> {
-        if let Some(mangle) = self.mangle.as_ref() {
-            mangle.unmount_entrypoint().await?;
-        }
-
         self.redirect.unmount_entrypoint().await
     }
 }
