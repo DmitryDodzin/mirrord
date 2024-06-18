@@ -79,7 +79,7 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+            format!("-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0");
 
         self.managed.add_rule(&redirect_rule)?;
 
@@ -93,7 +93,7 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+            format!("-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0");
 
         self.managed.remove_rule(&redirect_rule)?;
 
