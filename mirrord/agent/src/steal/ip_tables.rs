@@ -211,7 +211,7 @@ impl IPTables for IPTablesWrapper {
             .map_err(|e| AgentError::IPTablesError(e.to_string()))
     }
 
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "trace", ret)]
     fn list_rules(&self, chain: &str) -> Result<Vec<String>> {
         self.tables
             .list(self.table_name, chain)
