@@ -269,12 +269,16 @@ where
         let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
 
         if matches!(mangle, Some(MeshVendor::Istio)) {
-            redirect = Redirects::Mangle(MangleRedirect::create(mangle_ipt, Box::new(redirect))?)
+            redirect = Redirects::Mangle(
+                MangleRedirect::create(mangle_ipt, Box::new(redirect)).inspect_err(|error| {
+                    tracing::error!(?error, "Unable to create mangle redirect")
+                })?,
+            );
         }
 
         if flush_connections {
             redirect =
-                Redirects::FlushConnections(FlushConnections::create(ipt, Box::new(redirect))?)
+                Redirects::FlushConnections(FlushConnections::create(ipt, Box::new(redirect))?);
         }
 
         redirect.mount_entrypoint().await?;
@@ -302,11 +306,12 @@ where
         let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
 
         if matches!(mangle, Some(MeshVendor::Istio)) {
-            redirect = Redirects::Mangle(MangleRedirect::load(mangle_ipt, Box::new(redirect))?)
+            redirect = Redirects::Mangle(MangleRedirect::load(mangle_ipt, Box::new(redirect))?);
         }
 
         if flush_connections {
-            redirect = Redirects::FlushConnections(FlushConnections::load(ipt, Box::new(redirect))?)
+            redirect =
+                Redirects::FlushConnections(FlushConnections::load(ipt, Box::new(redirect))?);
         }
 
         Ok(Self { redirect })

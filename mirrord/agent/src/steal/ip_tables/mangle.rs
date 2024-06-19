@@ -25,18 +25,11 @@ where
     pub fn create(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
         let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
 
-        let gid = getgid();
-        managed
-            .add_rule(&format!("-m owner --gid-owner {gid} -p tcp -j RETURN"))
-            .inspect_err(|_| {
-                warn!("Unable to create iptable rule with \"--gid-owner {gid}\" mangle")
-            })?;
-
         Ok(MangleRedirect { managed, inner })
     }
 
     pub fn load(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
-        let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
+        let managed = IPTableChain::load(ipt, IPTABLE_MANGLE.to_string())?;
 
         Ok(MangleRedirect { managed, inner })
     }
@@ -78,8 +71,9 @@ where
             .add_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule =
-            format!("-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0");
+        let redirect_rule = format!(
+            "-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0"
+        );
 
         self.managed.add_rule(&redirect_rule)?;
 
@@ -92,8 +86,9 @@ where
             .remove_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule =
-            format!("-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0");
+        let redirect_rule = format!(
+            "-m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0"
+        );
 
         self.managed.remove_rule(&redirect_rule)?;
 
