@@ -73,7 +73,10 @@ where
             "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
         );
 
-        self.managed.add_rule(&redirect_rule)?;
+        if let Err(error) = self.managed.add_rule(&redirect_rule) {
+            let dmesg = tokio::process::Command::new("dmesg").output().await;
+            tracing::error!(?error, ?dmesg, "error adding mangle redirect");
+        }
 
         Ok(())
     }
@@ -88,7 +91,10 @@ where
             "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
         );
 
-        self.managed.remove_rule(&redirect_rule)?;
+        if let Err(error) = self.managed.remove_rule(&redirect_rule) {
+            let dmesg = tokio::process::Command::new("dmesg").output().await;
+            tracing::error!(?error, ?dmesg, "error removing mangle redirect");
+        }
 
         Ok(())
     }
