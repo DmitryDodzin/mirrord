@@ -70,7 +70,7 @@ where
             .await?;
 
         let redirect_rule = format!(
-            "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
+            "-o lo -m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port}"
         );
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
@@ -88,7 +88,7 @@ where
             .await?;
 
         let redirect_rule = format!(
-            "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
+            "-o lo -m tcp -p tcp --dport {redirected_port} -j TPROXY --on-port {target_port}"
         );
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
