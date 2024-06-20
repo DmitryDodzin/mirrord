@@ -75,7 +75,7 @@ where
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
-            tracing::error!(?error, %dmesg, "error adding mangle redirect");
+            tracing::error!(?error, ?dmesg, "error adding mangle redirect");
         }
 
         Ok(())
@@ -92,7 +92,7 @@ where
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
-            tracing::error!(?error, %dmesg, "error removing mangle redirect");
+            tracing::error!(?error, ?dmesg, "error removing mangle redirect");
         }
 
         Ok(())
