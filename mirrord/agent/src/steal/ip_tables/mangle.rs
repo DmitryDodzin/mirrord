@@ -71,11 +71,11 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-p tcp -m mark ! --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0 --tproxy-mark 0x539/0xfff");
+            format!("-p tcp -m mark ! --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 127.0.0.1");
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
-            tracing::error!(?error, ?dmesg, "error adding mangle redirect");
+            tracing::error!(?error, %dmesg, "error adding mangle redirect");
         }
 
         Ok(())
@@ -88,11 +88,11 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-p tcp -m mark ! --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 0.0.0.0 --tproxy-mark 0x539/0xfff");
+            format!("-p tcp -m mark ! --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 127.0.0.1");
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
-            tracing::error!(?error, ?dmesg, "error removing mangle redirect");
+            tracing::error!(?error, %dmesg, "error removing mangle redirect");
         }
 
         Ok(())

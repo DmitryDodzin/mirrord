@@ -359,11 +359,22 @@ mod tests {
 
     #[tokio::test]
     async fn default() {
+        let mut mangle_mock = MockIPTables::new();
+
+        mangle_mock
+            .expect_list_rules()
+            .with(eq("OUTPUT"))
+            .returning(|_| Ok(vec![]));
+
         let mut mock = MockIPTables::new();
 
         mock.expect_list_rules()
             .with(eq("OUTPUT"))
             .returning(|_| Ok(vec![]));
+
+        mock.with_table()
+            .with(eq("mangle"))
+            .returning(|_| Ok(mangle_mock));
 
         mock.expect_create_chain()
             .with(str::starts_with("MIRRORD_INPUT_"))
