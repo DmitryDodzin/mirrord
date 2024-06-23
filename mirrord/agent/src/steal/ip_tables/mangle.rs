@@ -23,10 +23,8 @@ where
     pub fn create(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
         let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
 
-        self.managed.add_rule("-i lo -d 127.0.0.1/32 -j RETURN");
-
-        self.managed
-            .add_rule("-m mark --mark 0x539/0xfff -j RETURN");
+        managed.add_rule("-i lo -d 127.0.0.1/32 -j RETURN");
+        managed.add_rule("-m mark --mark 0x539/0xfff -j RETURN");
 
         Ok(MangleRedirect { managed, inner })
     }
