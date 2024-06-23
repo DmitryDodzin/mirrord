@@ -70,8 +70,9 @@ where
             .add_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule =
-            format!("-p tcp -m mark --mark 0x111/0xfff --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+        let redirect_rule = format!(
+            "! -d 127.0.0.1/32 -i lo --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
+        );
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
@@ -87,8 +88,9 @@ where
             .remove_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule =
-            format!("-p tcp -m mark --mark 0x111/0xfff --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+        let redirect_rule = format!(
+            "! -d 127.0.0.1/32 -i lo --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
+        );
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
