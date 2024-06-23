@@ -71,7 +71,7 @@ where
             .await?;
 
         let redirect_rule = format!(
-            "! -d 127.0.0.1/32 -i lo --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
+            "! -d 127.0.0.1/32 -i lo -p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
         );
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
@@ -89,7 +89,7 @@ where
             .await?;
 
         let redirect_rule = format!(
-            "! -d 127.0.0.1/32 -i lo --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
+            "! -d 127.0.0.1/32 -i lo -p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
         );
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
