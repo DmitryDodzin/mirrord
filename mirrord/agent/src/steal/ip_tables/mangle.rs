@@ -18,7 +18,7 @@ where
     IPT: IPTables,
     T: Redirect,
 {
-    const ENTRYPOINT: &'static str = "OUTPUT";
+    const ENTRYPOINT: &'static str = "PREROUTING";
 
     pub fn create(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
         let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
@@ -71,7 +71,7 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-d 127.0.0.1/32 -p tcp -m mark --mark 0x539/0xfff --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+            format!("-p tcp -m mark --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 127.0.0.1");
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
@@ -88,7 +88,7 @@ where
             .await?;
 
         let redirect_rule =
-            format!("-d 127.0.0.1/32 -p tcp -m mark --mark 0x539/0xfff --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
+            format!("-p tcp -m mark --mark 0x111/0xfff --dport {redirected_port} -j TPROXY --on-port {target_port} --on-ip 127.0.0.1");
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
