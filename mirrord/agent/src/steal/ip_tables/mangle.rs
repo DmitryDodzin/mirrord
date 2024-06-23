@@ -43,10 +43,9 @@ where
     async fn mount_entrypoint(&self) -> Result<()> {
         self.inner.mount_entrypoint().await?;
 
-        self.managed.inner().insert_rule(
+        self.managed.inner().add_rule(
             Self::ENTRYPOINT,
             &format!("-j {}", self.managed.chain_name()),
-            1,
         )?;
 
         Ok(())
