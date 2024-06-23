@@ -265,12 +265,11 @@ where
             }
         };
 
-        let mangle_ipt = Arc::new(ipt.with_table("mangle"));
-        let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
+        let mangle = MeshVendor::detect(&ipt.with_table("mangle"))?;
 
         if matches!(mangle, Some(MeshVendor::Istio)) {
             redirect = Redirects::Mangle(
-                MangleRedirect::create(mangle_ipt, Box::new(redirect)).inspect_err(|error| {
+                MangleRedirect::create(ipt.clone(), Box::new(redirect)).inspect_err(|error| {
                     tracing::error!(?error, "Unable to create mangle redirect")
                 })?,
             );
@@ -302,11 +301,10 @@ where
             }
         };
 
-        let mangle_ipt = Arc::new(ipt.with_table("mangle"));
-        let mangle = MeshVendor::detect(mangle_ipt.as_ref())?;
+        let mangle = MeshVendor::detect(&ipt.with_table("mangle"))?;
 
         if matches!(mangle, Some(MeshVendor::Istio)) {
-            redirect = Redirects::Mangle(MangleRedirect::load(mangle_ipt, Box::new(redirect))?);
+            redirect = Redirects::Mangle(MangleRedirect::load(ipt.clone(), Box::new(redirect))?);
         }
 
         if flush_connections {
