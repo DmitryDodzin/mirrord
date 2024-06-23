@@ -23,6 +23,11 @@ where
     pub fn create(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
         let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
 
+        self.managed.add_rule("-i lo -d 127.0.0.1/32 -j RETURN");
+
+        self.managed
+            .add_rule("-m mark --mark 0x539/0xfff -j RETURN");
+
         Ok(MangleRedirect { managed, inner })
     }
 
@@ -70,9 +75,7 @@ where
             .add_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule = format!(
-            "! -d 127.0.0.1/32 -i lo -p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
-        );
+        let redirect_rule = format!("-p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff");
 
         if let Err(error) = self.managed.add_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
@@ -88,9 +91,7 @@ where
             .remove_redirect(redirected_port, target_port)
             .await?;
 
-        let redirect_rule = format!(
-            "! -d 127.0.0.1/32 -i lo -p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff"
-        );
+        let redirect_rule = format!("-p tcp -m tcp --dport {redirected_port} -j TPROXY --on-port {target_port} --tproxy-mark 0x111/0xfff");
 
         if let Err(error) = self.managed.remove_rule(&redirect_rule) {
             let dmesg = tokio::process::Command::new("dmesg").output().await;
