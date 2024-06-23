@@ -18,7 +18,7 @@ where
     IPT: IPTables,
     T: Redirect,
 {
-    const ENTRYPOINT: &'static str = "OUTPUT";
+    const ENTRYPOINT: &'static str = "PREROUTING";
 
     pub fn create(ipt: Arc<IPT>, inner: Box<T>) -> Result<Self> {
         let managed = IPTableChain::create(ipt, IPTABLE_MANGLE.to_string())?;
