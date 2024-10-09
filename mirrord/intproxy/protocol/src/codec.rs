@@ -119,6 +119,11 @@ impl<T, R> SyncDecoder<T, R> {
         }
     }
 
+    /// Expose the underlying IO handler.
+    pub fn inner(&self) -> &R {
+        &self.reader
+    }
+
     /// Unwraps the underlying IO handler.
     pub fn into_inner(self) -> R {
         self.reader

@@ -118,6 +118,9 @@ pub(crate) enum HookError {
 
     #[error("mirrord-layer: Failed encoding value with `{0}`!")]
     BincodeEncode(#[from] bincode::error::EncodeError),
+
+    #[error("mirrord-layer: socket not connected but action was requestd")]
+    SocketNotConnectd,
 }
 
 /// Errors internal to mirrord-layer.
@@ -205,6 +208,7 @@ impl From<HookError> for i64 {
     fn from(fail: HookError) -> Self {
         match fail {
             HookError::AddressAlreadyBound(_)
+            | HookError::SocketNotConnectd
             | HookError::ResponseError(
                 ResponseError::NotFound(_)
                 | ResponseError::NotFile(_)
@@ -304,6 +308,7 @@ impl From<HookError> for i64 {
             #[cfg(target_os = "linux")]
             HookError::EmptyPath => libc::ENOENT,
             HookError::InvalidBindAddressForDomain => libc::EINVAL,
+            HookError::SocketNotConnectd => libc::ENOTCONN,
         };
 
         set_errno(errno::Errno(libc_error));

@@ -89,6 +89,16 @@ pub fn make_proxy_request_no_response<T: IsLayerRequest + Debug>(
     }
 }
 
+pub fn poll_proxy_connection() -> HookResult<()> {
+    unsafe {
+        PROXY_CONNECTION
+            .get()
+            .ok_or(HookError::CannotGetProxyConnection)?
+            .poll()
+            .map_err(Into::into)
+    }
+}
+
 /// Converts raw pointer values `P` to some other type.
 ///
 /// ## Usage

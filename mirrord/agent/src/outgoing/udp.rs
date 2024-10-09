@@ -127,7 +127,7 @@ impl UdpOutgoingApi {
                     match layer_message {
                         // [user] -> [layer] -> [agent] -> [layer]
                         // `user` is asking us to connect to some remote host.
-                        LayerUdpOutgoing::Connect(LayerConnect { remote_address }) => {
+                        LayerUdpOutgoing::Connect(LayerConnect { remote_address, .. }) => {
                             let daemon_connect = connect(remote_address.clone().try_into()?)
                                     .await
                                     .and_then(|mirror_socket| {

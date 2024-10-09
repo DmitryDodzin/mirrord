@@ -4152,7 +4152,6 @@ name = "mirrord-intproxy-protocol"
 version = "3.119.0"
 dependencies = [
  "bincode",
- "bitflags 2.6.0",
  "mirrord-protocol",
  "thiserror",
  "tokio",
@@ -4301,10 +4300,11 @@ dependencies = [
 
 [[package]]
 name = "mirrord-protocol"
-version = "1.11.0"
+version = "1.12.0"
 dependencies = [
  "actix-codec",
  "bincode",
+ "bitflags 2.6.0",
  "bytes",
  "fancy-regex",
  "hickory-resolver",

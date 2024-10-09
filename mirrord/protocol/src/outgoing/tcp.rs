@@ -13,4 +13,5 @@ pub enum DaemonTcpOutgoing {
     Connect(RemoteResult<DaemonConnect>),
     Read(RemoteResult<DaemonRead>),
     Close(ConnectionId),
+    InProgress(RemoteResult<DaemonConnecting>),
 }

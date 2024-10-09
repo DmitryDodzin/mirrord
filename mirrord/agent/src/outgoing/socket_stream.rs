@@ -1,12 +1,14 @@
 use std::{
     io,
     io::Error,
+    net::IpAddr,
     os::{
         linux::net::SocketAddrExt,
         unix::net::{SocketAddr as StdUnixSocketAddr, UnixStream as StdUnixStream},
     },
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use mirrord_protocol::{
@@ -57,6 +59,35 @@ impl SocketStream {
                 })
             }
         })
+    }
+
+    pub async fn writable(&self) -> io::Result<()> {
+        match self {
+            SocketStream::Ip(tcp_stream) => tcp_stream.writable().await,
+            SocketStream::Unix(unix_stream) => unix_stream.writable().await,
+        }
+    }
+
+    pub fn connect_non_blocking(addr: SocketAddress, timeout: Duration) -> RemoteResult<Self> {
+        match addr {
+            SocketAddress::Ip(addr) => {
+                let socket = socket2::Socket::new(
+                    match addr.ip() {
+                        IpAddr::V4(_) => socket2::Domain::IPV4,
+                        IpAddr::V6(_) => socket2::Domain::IPV6,
+                    },
+                    socket2::Type::STREAM,
+                    None,
+                )?;
+                let addr = socket2::SockAddr::from(addr);
+
+                socket.set_nonblocking(true)?;
+                let _ = socket.connect_timeout(&addr, timeout);
+
+                Ok(Self::from(TcpStream::from_std(socket.into())?))
+            }
+            _ => unimplemented!("connect_non_blocking {addr:?}"),
+        }
     }
 
     /// Connect to a given [`SocketAddress`], whether IP or unix.

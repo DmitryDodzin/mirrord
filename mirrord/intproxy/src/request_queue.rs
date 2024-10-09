@@ -49,6 +49,11 @@ impl RequestQueue {
         self.inner.push_back((message_id, layer_id));
     }
 
+    /// Retrieve and don't remove a request from the front of this queue.
+    pub fn peek(&self) -> Result<&(MessageId, LayerId), RequestQueueEmpty> {
+        self.inner.front().ok_or(RequestQueueEmpty)
+    }
+
     /// Retrieve and remove a request from the front of this queue.
     #[tracing::instrument(level = Level::TRACE)]
     pub fn get(&mut self) -> Result<(MessageId, LayerId), RequestQueueEmpty> {

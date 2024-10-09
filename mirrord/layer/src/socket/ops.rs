@@ -17,12 +17,13 @@ use errno::set_errno;
 use libc::{c_int, c_void, hostent, sockaddr, socklen_t, AF_UNIX};
 use mirrord_config::feature::network::incoming::{IncomingConfig, IncomingMode};
 use mirrord_intproxy_protocol::{
-    ConnMetadataRequest, ConnMetadataResponse, NetProtocol, OutgoingConnectFlags,
-    OutgoingConnectRequest, OutgoingConnectResponse, PortSubscribe,
+    ConnMetadataRequest, ConnMetadataResponse, NetProtocol, OutgoingConnectRequest,
+    OutgoingConnectResponse, PortSubscribe,
 };
 use mirrord_protocol::{
     dns::{GetAddrInfoRequest, LookupRecord},
     file::{OpenFileResponse, OpenOptionsInternal, ReadFileResponse},
+    outgoing::ConnectFlags,
 };
 use nix::{
     fcntl::OFlag,
@@ -290,7 +291,9 @@ pub(super) fn bind(
         .lock()?
         .iter()
         .any(|(_, socket)| match &socket.state {
-            SocketState::Initialized | SocketState::Connecting | SocketState::Connected(_) => false,
+            SocketState::Initialized | SocketState::Connecting(_) | SocketState::Connected(_) => {
+                false
+            }
             SocketState::Bound(bound) | SocketState::Listening(bound) => {
                 bound.requested_address == requested_address
             }
@@ -461,7 +464,7 @@ fn connect_outgoing<const CALL_CONNECT: bool>(
     remote_address: SockAddr,
     mut user_socket_info: Arc<UserSocket>,
     protocol: NetProtocol,
-    flags: OutgoingConnectFlags,
+    flags: ConnectFlags,
 ) -> Detour<ConnectResult> {
     // Closure that performs the connection with mirrord messaging.
     let remote_connection = |remote_address: SockAddr| {
@@ -516,7 +519,10 @@ fn connect_outgoing<const CALL_CONNECT: bool>(
 
                 Detour::Success(connect_result)
             }
-            Ok(OutgoingConnectResponse::InProgress { layer_address }) => {
+            Ok(OutgoingConnectResponse::InProgress {
+                layer_address,
+                in_cluster_address,
+            }) => {
                 // Connect to the interceptor socket that is listening.
                 let connect_result: ConnectResult = if CALL_CONNECT {
                     let layer_address = SockAddr::try_from(layer_address.clone())?;
@@ -538,7 +544,7 @@ fn connect_outgoing<const CALL_CONNECT: bool>(
 
                 Arc::get_mut(&mut user_socket_info)
                     .expect("user_socket_info should be accessible via mutable ref")
-                    .state = SocketState::Connecting;
+                    .state = SocketState::Connecting(in_cluster_address);
 
                 SOCKETS.lock()?.insert(sockfd, user_socket_info);
 
@@ -650,10 +656,10 @@ pub(super) fn connect(
         .map(OFlag::from_bits_truncate)
         .map_err(io::Error::from)?;
 
-    let mut outgoing_flags = OutgoingConnectFlags::empty();
+    let mut outgoing_flags = ConnectFlags::empty();
 
     if socket_fd_flags.contains(OFlag::O_NONBLOCK) {
-        outgoing_flags |= OutgoingConnectFlags::NONBLOCK;
+        outgoing_flags |= ConnectFlags::NONBLOCK;
     }
 
     tracing::debug!(flags = ?socket_fd_flags, sockets = ?SOCKETS, "in connect");
@@ -738,7 +744,7 @@ pub(super) fn connect(
         ),
 
         NetProtocol::Stream => match user_socket_info.state {
-            SocketState::Initialized | SocketState::Connecting | SocketState::Bound(..)
+            SocketState::Initialized | SocketState::Connecting(_) | SocketState::Bound(..)
                 if (optional_ip_address.is_some() && enabled_tcp_outgoing)
                     || (remote_address.is_unix() && !unix_streams.is_empty()) =>
             {
@@ -766,12 +772,15 @@ pub(super) fn getpeername(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> Detour<i32> {
+    common::poll_proxy_connection()?;
+
     let remote_address = {
         SOCKETS
             .lock()?
             .get(&sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .and_then(|socket| match &socket.state {
+                SocketState::Connecting(_) => Detour::Error(HookError::SocketNotConnectd),
                 SocketState::Connected(connected) => {
                     Detour::Success(connected.remote_address.clone())
                 }
@@ -796,12 +805,15 @@ pub(super) fn getsockname(
     address: *mut sockaddr,
     address_len: *mut socklen_t,
 ) -> Detour<i32> {
+    common::poll_proxy_connection()?;
+
     let local_address = {
         SOCKETS
             .lock()?
             .get(&sockfd)
             .bypass(Bypass::LocalFdNotFound(sockfd))
             .and_then(|socket| match &socket.state {
+                SocketState::Connecting(local_address) => Detour::Success(local_address.clone()),
                 SocketState::Connected(connected) => {
                     Detour::Success(connected.local_address.clone())
                 }
@@ -1390,7 +1402,7 @@ pub(super) fn send_to(
             destination,
             user_socket_info,
             NetProtocol::Datagrams,
-            OutgoingConnectFlags::empty(),
+            ConnectFlags::empty(),
         )?;
 
         let layer_address: SockAddr = SOCKETS
@@ -1484,7 +1496,7 @@ pub(super) fn sendmsg(
             destination,
             user_socket_info,
             NetProtocol::Datagrams,
-            OutgoingConnectFlags::empty(),
+            ConnectFlags::empty(),
         )?;
 
         let layer_address: SockAddr = SOCKETS

@@ -265,18 +265,47 @@ impl TcpOutgoingTask {
         match message {
             // We make connection to the requested address, split the stream into halves with
             // `io::split`, and put them into respective maps.
-            LayerTcpOutgoing::Connect(LayerConnect { remote_address }) => {
-                let daemon_connect = time::timeout(
-                    Self::CONNECT_TIMEOUT,
-                    SocketStream::connect(remote_address.clone(), self.pid),
-                )
-                .await
-                .unwrap_or_else(|_elapsed| {
-                    Err(ResponseError::Remote(RemoteError::ConnectTimedOut(
+            LayerTcpOutgoing::Connect(LayerConnect {
+                remote_address,
+                flags,
+            }) => {
+                let stream = if flags.contains(ConnectFlags::NONBLOCK) {
+                    let stream = SocketStream::connect_non_blocking(
                         remote_address.clone(),
-                    )))
-                })
-                .and_then(|remote_stream| {
+                        Self::CONNECT_TIMEOUT,
+                    )
+                    .unwrap();
+
+                    self.daemon_tx
+                        .send(DaemonTcpOutgoing::InProgress(Ok(DaemonConnecting {
+                            remote_address: remote_address.clone(),
+                            local_address: stream.local_addr().unwrap(),
+                        })))
+                        .await;
+
+                    stream
+                        .writable()
+                        .await
+                        .map(|_| Ok(stream))
+                        .unwrap_or_else(|_| {
+                            Err(ResponseError::Remote(RemoteError::ConnectTimedOut(
+                                remote_address.clone(),
+                            )))
+                        })
+                } else {
+                    time::timeout(
+                        Self::CONNECT_TIMEOUT,
+                        SocketStream::connect(remote_address.clone(), self.pid),
+                    )
+                    .await
+                    .unwrap_or_else(|_elapsed| {
+                        Err(ResponseError::Remote(RemoteError::ConnectTimedOut(
+                            remote_address.clone(),
+                        )))
+                    })
+                };
+
+                let daemon_connect = stream.and_then(|remote_stream| {
                     let agent_address = remote_stream.local_addr()?;
                     let connection_id = self.next_connection_id;
                     self.next_connection_id += 1;

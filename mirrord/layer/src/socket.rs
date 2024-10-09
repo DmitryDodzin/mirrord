@@ -150,7 +150,7 @@ pub struct Bound {
 pub enum SocketState {
     #[default]
     Initialized,
-    Connecting,
+    Connecting(SocketAddress),
     Bound(Bound),
     Listening(Bound),
     Connected(Connected),

@@ -23,7 +23,7 @@ use mirrord_protocol::{
     dns::{DnsLookup, GetAddrInfoRequest, GetAddrInfoResponse, LookupRecord},
     outgoing::{
         tcp::{DaemonTcpOutgoing, LayerTcpOutgoing},
-        LayerClose, LayerConnect, LayerWrite, SocketAddress,
+        ConnectFlags, LayerClose, LayerConnect, LayerWrite, SocketAddress,
     },
     tcp::{Filter, HttpFilter, LayerTcp, LayerTcpSteal, StealType},
     ClientMessage, ConnectionId, DaemonMessage, LogLevel, Port, ResponseError,
@@ -268,6 +268,7 @@ impl PortForwarder {
                         "connection closed for port mapping {local_socket}:{remote_socket}, connection {connection_id}"
                     );
                 }
+                DaemonTcpOutgoing::InProgress(_) => {}
             },
             DaemonMessage::GetAddrInfoResponse(GetAddrInfoResponse(message)) => match message {
                 Ok(DnsLookup(record)) if !record.is_empty() => {
@@ -391,7 +392,10 @@ impl PortForwarder {
                 self.agent_connection
                     .sender
                     .send(ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(
-                        LayerConnect { remote_address },
+                        LayerConnect {
+                            remote_address,
+                            flags: ConnectFlags::empty(),
+                        },
                     )))
                     .await?;
             }

@@ -494,6 +494,13 @@ fn enable_hooks(state: &LayerSetup) {
     let mut hook_manager = HookManager::default();
 
     unsafe {
+        replace!(
+            &mut hook_manager,
+            "gettimeofday",
+            gettimeofday_detour,
+            FnGettimeofday,
+            FN_GETTIMEOFDAY
+        );
         replace!(&mut hook_manager, "close", close_detour, FnClose, FN_CLOSE);
         replace!(
             &mut hook_manager,
@@ -648,6 +655,18 @@ pub(crate) unsafe extern "C" fn fork_detour() -> pid_t {
     }
 
     res
+}
+
+#[hook_fn]
+pub(crate) unsafe extern "C" fn gettimeofday_detour(
+    tp: *mut libc::timeval,
+    tz: *mut libc::timezone,
+) -> c_int {
+    if let Some(proxy_connection) = PROXY_CONNECTION.get() {
+        let _ = proxy_connection.poll();
+    }
+
+    FN_GETTIMEOFDAY(tp, tz)
 }
 
 /// No need to guard because we call another detour which will do the guard for us.

@@ -8,6 +8,7 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
+use bitflags::bitflags;
 use socket2::SockAddr as OsSockAddr;
 
 use crate::{
@@ -121,10 +122,45 @@ impl Display for SocketAddress {
     }
 }
 
+bitflags! {
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ConnectFlags: u8 {
+        const NONBLOCK = 0x0001;
+    }
+}
+
+impl<'de> bincode::BorrowDecode<'de> for ConnectFlags {
+    fn borrow_decode<D>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError>
+    where
+        D: bincode::de::BorrowDecoder<'de>,
+    {
+        bincode::BorrowDecode::borrow_decode(decoder).map(ConnectFlags::from_bits_retain)
+    }
+}
+
+impl Encode for ConnectFlags {
+    fn encode<E>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError>
+    where
+        E: bincode::enc::Encoder,
+    {
+        self.bits().encode(encoder)
+    }
+}
+
+impl Decode for ConnectFlags {
+    fn decode<D>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError>
+    where
+        D: bincode::de::Decoder,
+    {
+        Decode::decode(decoder).map(ConnectFlags::from_bits_retain)
+    }
+}
+
 /// `user` wants to connect to `remote_address`.
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct LayerConnect {
     pub remote_address: SocketAddress,
+    pub flags: ConnectFlags,
 }
 
 /// `user` wants to write `bytes` to remote host identified by `connection_id`.
@@ -152,6 +188,12 @@ pub struct LayerClose {
 #[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct DaemonConnect {
     pub connection_id: ConnectionId,
+    pub remote_address: SocketAddress,
+    pub local_address: SocketAddress,
+}
+
+#[derive(Encode, Decode, Debug, PartialEq, Eq, Clone)]
+pub struct DaemonConnecting {
     pub remote_address: SocketAddress,
     pub local_address: SocketAddress,
 }

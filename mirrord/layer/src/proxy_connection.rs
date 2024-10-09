@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt, io,
     net::{SocketAddr, TcpStream},
+    os::fd::AsRawFd,
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex, PoisonError,
@@ -100,6 +101,10 @@ impl ProxyConnection {
         Ok(message_id)
     }
 
+    pub fn poll(&self) -> Result<()> {
+        self.responses.lock()?.poll_outstanding()
+    }
+
     pub fn receive(&self, response_id: MessageId) -> Result<ProxyToLayerMessage> {
         self.responses.lock()?.receive(response_id)
     }
@@ -150,12 +155,12 @@ impl ProxyConnection {
         response_id: MessageId,
         handler: impl FnOnce(ProxyToLayerMessage) + 'static,
     ) -> Result<()> {
-        let mut guard = self.responses.lock()?;
+        let mut responses_guard = self.responses.lock()?;
 
-        if let Some(response) = guard.outstanding_responses.remove(&response_id) {
+        if let Some(response) = responses_guard.outstanding_responses.remove(&response_id) {
             handler(response);
         } else {
-            guard
+            responses_guard
                 .outstanding_handlers
                 .insert(response_id, Box::new(handler));
         }
@@ -185,6 +190,38 @@ impl ResponseManager {
             outstanding_responses: Default::default(),
             outstanding_handlers: Default::default(),
         }
+    }
+
+    fn poll_outstanding(&mut self) -> Result<()> {
+        let raw_fd = self.receiver.inner().as_raw_fd();
+
+        let mut fds = libc::pollfd {
+            fd: raw_fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+
+        let res = unsafe { libc::poll(&mut fds, 1, 0) };
+
+        if res > 0 {
+            if fds.revents & libc::POLLIN != 0 {
+                let response = self
+                    .receiver
+                    .receive()?
+                    .ok_or(ProxyError::ConnectionClosed)?;
+
+                if let Some(handler) = self.outstanding_handlers.remove(&response.message_id) {
+                    handler(response.inner);
+                } else {
+                    self.outstanding_responses
+                        .insert(response.message_id, response.inner);
+                }
+            }
+        } else if res != 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+
+        Ok(())
     }
 
     fn receive(&mut self, response_id: u64) -> Result<ProxyToLayerMessage> {

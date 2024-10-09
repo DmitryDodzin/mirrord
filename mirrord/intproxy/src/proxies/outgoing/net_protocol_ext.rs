@@ -11,8 +11,8 @@ use bytes::BytesMut;
 use mirrord_intproxy_protocol::NetProtocol;
 use mirrord_protocol::{
     outgoing::{
-        tcp::LayerTcpOutgoing, udp::LayerUdpOutgoing, LayerClose, LayerConnect, LayerWrite,
-        SocketAddress, UnixAddr,
+        tcp::LayerTcpOutgoing, udp::LayerUdpOutgoing, ConnectFlags, LayerClose, LayerConnect,
+        LayerWrite, SocketAddress, UnixAddr,
     },
     ClientMessage, ConnectionId,
 };
@@ -36,7 +36,11 @@ pub trait NetProtocolExt: Sized {
 
     /// Creates a [`LayerConnect`] message and wraps it into the common [`ClientMessage`] type.
     /// The enum path used here depends on this protocol.
-    fn wrap_agent_connect(self, remote_address: SocketAddress) -> ClientMessage;
+    fn wrap_agent_connect(
+        self,
+        remote_address: SocketAddress,
+        flags: ConnectFlags,
+    ) -> ClientMessage;
 
     /// Opens a new socket for intercepting a connection to the given remote address.
     async fn prepare_socket(self, for_remote_address: SocketAddress) -> io::Result<PreparedSocket>;
@@ -67,15 +71,21 @@ impl NetProtocolExt for NetProtocol {
         }
     }
 
-    fn wrap_agent_connect(self, remote_address: SocketAddress) -> ClientMessage {
+    fn wrap_agent_connect(
+        self,
+        remote_address: SocketAddress,
+        flags: ConnectFlags,
+    ) -> ClientMessage {
         match self {
             Self::Datagrams => {
                 ClientMessage::UdpOutgoing(LayerUdpOutgoing::Connect(LayerConnect {
                     remote_address,
+                    flags,
                 }))
             }
             Self::Stream => ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
                 remote_address,
+                flags,
             })),
         }
     }

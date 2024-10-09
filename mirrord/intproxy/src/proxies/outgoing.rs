@@ -3,11 +3,13 @@
 use std::{collections::HashMap, fmt, io};
 
 use mirrord_intproxy_protocol::{
-    LayerId, MessageId, NetProtocol, OutgoingConnectFlags, OutgoingConnectRequest,
-    OutgoingConnectResponse, ProxyToLayerMessage,
+    LayerId, MessageId, NetProtocol, OutgoingConnectRequest, OutgoingConnectResponse,
+    ProxyToLayerMessage,
 };
 use mirrord_protocol::{
-    outgoing::{tcp::DaemonTcpOutgoing, udp::DaemonUdpOutgoing, DaemonConnect, DaemonRead},
+    outgoing::{
+        tcp::DaemonTcpOutgoing, udp::DaemonUdpOutgoing, DaemonConnect, DaemonConnecting, DaemonRead,
+    },
     ConnectionId, RemoteResult, ResponseError,
 };
 use thiserror::Error;
@@ -203,6 +205,45 @@ impl OutgoingProxy {
         Ok(())
     }
 
+    #[tracing::instrument(level = Level::TRACE, skip(self, message_bus))]
+    async fn handle_in_progress_response(
+        &mut self,
+        connecting: RemoteResult<DaemonConnecting>,
+        protocol: NetProtocol,
+        message_bus: &mut MessageBus<Self>,
+    ) -> Result<(), OutgoingProxyError> {
+        let DaemonConnecting {
+            remote_address,
+            local_address,
+            ..
+        } = connecting.unwrap();
+
+        let (message_id, layer_id) = *self.queue(protocol).peek()?;
+
+        let response: RemoteResult<_> = try {
+            let prepared_socket = protocol.prepare_socket(remote_address.clone()).await?;
+            let layer_address = prepared_socket.local_address()?;
+
+            self.connecting_sockets
+                .insert((message_id, layer_id), prepared_socket);
+
+            OutgoingConnectResponse::InProgress {
+                layer_address,
+                in_cluster_address: local_address,
+            }
+        };
+
+        message_bus
+            .send(ToLayer {
+                message: ProxyToLayerMessage::OutgoingConnect(response),
+                message_id,
+                layer_id,
+            })
+            .await;
+
+        Ok(())
+    }
+
     /// Saves the layer's request id and sends the connection request to the agent.
     #[tracing::instrument(level = Level::TRACE, skip(self, message_bus))]
     async fn handle_connect_request(
@@ -212,40 +253,11 @@ impl OutgoingProxy {
         request: OutgoingConnectRequest,
         message_bus: &mut MessageBus<Self>,
     ) {
-        if matches!(request.protocol, NetProtocol::Stream)
-            && request.flags.contains(OutgoingConnectFlags::NONBLOCK)
-        {
-            let response: RemoteResult<_> = try {
-                let prepared_socket = request
-                    .protocol
-                    .prepare_socket(request.remote_address.clone())
-                    .await?;
-                let layer_address = prepared_socket.local_address()?;
-
-                self.connecting_sockets
-                    .insert((message_id, layer_id), prepared_socket);
-
-                OutgoingConnectResponse::InProgress { layer_address }
-            };
-
-            let did_error = response.is_err();
-
-            message_bus
-                .send(ToLayer {
-                    message: ProxyToLayerMessage::OutgoingConnect(response),
-                    message_id,
-                    layer_id,
-                })
-                .await;
-
-            if did_error {
-                return;
-            }
-        }
-
         self.queue(request.protocol).insert(message_id, layer_id);
 
-        let msg = request.protocol.wrap_agent_connect(request.remote_address);
+        let msg = request
+            .protocol
+            .wrap_agent_connect(request.remote_address, request.flags);
         message_bus.send(ProxyMessage::ToAgent(msg)).await;
     }
 }
@@ -277,6 +289,7 @@ impl BackgroundTask for OutgoingProxy {
                         },
                         DaemonTcpOutgoing::Read(read) => self.handle_agent_read(read, NetProtocol::Stream).await?,
                         DaemonTcpOutgoing::Connect(connect) => self.handle_connect_response(connect, NetProtocol::Stream, message_bus).await?,
+                        DaemonTcpOutgoing::InProgress(connecting) => self.handle_in_progress_response(connecting, NetProtocol::Stream, message_bus).await?
                     }
                     Some(OutgoingProxyMessage::AgentDatagrams(req)) => match req {
                         DaemonUdpOutgoing::Close(close) => {
