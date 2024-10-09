@@ -193,32 +193,18 @@ impl ResponseManager {
     }
 
     fn poll_outstanding(&mut self) -> Result<()> {
-        let raw_fd = self.receiver.inner().as_raw_fd();
+        while !self.outstanding_handlers.is_empty() {
+            let response = self
+                .receiver
+                .receive()?
+                .ok_or(ProxyError::ConnectionClosed)?;
 
-        let mut fds = libc::pollfd {
-            fd: raw_fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-
-        let res = unsafe { libc::poll(&mut fds, 1, 0) };
-
-        if res > 0 {
-            if fds.revents & libc::POLLIN != 0 {
-                let response = self
-                    .receiver
-                    .receive()?
-                    .ok_or(ProxyError::ConnectionClosed)?;
-
-                if let Some(handler) = self.outstanding_handlers.remove(&response.message_id) {
-                    handler(response.inner);
-                } else {
-                    self.outstanding_responses
-                        .insert(response.message_id, response.inner);
-                }
+            if let Some(handler) = self.outstanding_handlers.remove(&response.message_id) {
+                handler(response.inner);
+            } else {
+                self.outstanding_responses
+                    .insert(response.message_id, response.inner);
             }
-        } else if res != 0 {
-            return Err(std::io::Error::last_os_error().into());
         }
 
         Ok(())
