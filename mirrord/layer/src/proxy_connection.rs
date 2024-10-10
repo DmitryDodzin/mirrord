@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fmt, io,
     net::{SocketAddr, TcpStream},
-    os::fd::AsRawFd,
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex, PoisonError,
