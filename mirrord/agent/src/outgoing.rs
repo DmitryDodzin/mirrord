@@ -281,7 +281,7 @@ impl TcpOutgoingTask {
                             remote_address: remote_address.clone(),
                             local_address: stream.local_addr().unwrap(),
                         })))
-                        .await;
+                        .await?;
 
                     stream
                         .writable()
