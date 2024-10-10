@@ -33,6 +33,10 @@ impl SocketAddress {
             SocketAddress::Unix(_) => None,
         }
     }
+
+    pub fn is_unix(&self) -> bool {
+        matches!(self, SocketAddress::Unix(_))
+    }
 }
 
 /// A unix socket address type with rust member types (not libc stuff).

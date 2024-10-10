@@ -269,7 +269,8 @@ impl TcpOutgoingTask {
                 remote_address,
                 flags,
             }) => {
-                let stream = if flags.contains(ConnectFlags::NONBLOCK) {
+                let stream = if flags.contains(ConnectFlags::NONBLOCK) && !remote_address.is_unix()
+                {
                     let stream = SocketStream::connect_non_blocking(
                         remote_address.clone(),
                         Self::CONNECT_TIMEOUT,
