@@ -30,6 +30,7 @@ async fn recv_from(
     let msg = intproxy.recv().await;
     let ClientMessage::UdpOutgoing(LayerUdpOutgoing::Connect(LayerConnect {
         remote_address: SocketAddress::Ip(addr),
+        ..
     })) = msg
     else {
         panic!("Invalid message received from layer: {msg:?}");

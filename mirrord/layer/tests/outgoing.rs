@@ -43,6 +43,7 @@ async fn outgoing_udp(dylib_path: &Path) {
         let msg = intproxy.recv().await;
         let ClientMessage::UdpOutgoing(LayerUdpOutgoing::Connect(LayerConnect {
             remote_address: SocketAddress::Ip(addr),
+            ..
         })) = msg
         else {
             panic!("Invalid message received from layer: {msg:?}");
@@ -109,6 +110,7 @@ async fn outgoing_tcp_logic(with_config: Option<&str>, dylib_path: &Path, config
         let msg = intproxy.recv().await;
         let ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
             remote_address: SocketAddress::Ip(addr),
+            ..
         })) = msg
         else {
             panic!("Invalid message received from layer: {msg:?}");
@@ -200,6 +202,7 @@ async fn outgoing_tcp_bound_socket(dylib_path: &Path) {
         let msg = intproxy.recv().await;
         let ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
             remote_address: SocketAddress::Ip(addr),
+            ..
         })) = msg
         else {
             panic!("Invalid message received from layer: {msg:?}");

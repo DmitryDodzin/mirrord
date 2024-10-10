@@ -64,7 +64,7 @@ async fn test_issue2283(
     let message = intproxy.recv().await;
     assert_matches!(
         message,
-        ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect { remote_address}))
+        ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect { remote_address, .. }))
         if remote_address == SocketAddress::from(address)
     );
 

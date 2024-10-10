@@ -49,6 +49,7 @@ async fn test_issue1898(
         match message {
             ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
                 remote_address,
+                ..
             })) => {
                 let ip = match remote_address {
                     SocketAddress::Ip(ip) => ip,

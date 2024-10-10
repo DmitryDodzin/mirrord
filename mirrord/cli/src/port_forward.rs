@@ -988,7 +988,7 @@ mod test {
     use mirrord_protocol::{
         outgoing::{
             tcp::{DaemonTcpOutgoing, LayerTcpOutgoing},
-            DaemonConnect, DaemonRead, LayerConnect, LayerWrite, SocketAddress,
+            ConnectFlags, DaemonConnect, DaemonRead, LayerConnect, LayerWrite, SocketAddress,
         },
         tcp::{
             DaemonTcp, Filter, HttpRequest, HttpResponse, InternalHttpRequest,
@@ -1056,6 +1056,7 @@ mod test {
         let remote_address = SocketAddress::Ip("152.37.40.40:3038".parse().unwrap());
         let expected = ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
             remote_address: remote_address.clone(),
+            flags: ConnectFlags::empty(),
         }));
         let message = match client_msg_rx.recv().await.ok_or(0).unwrap() {
             ClientMessage::Ping => client_msg_rx.recv().await.ok_or(0).unwrap(),
@@ -1160,6 +1161,7 @@ mod test {
             SocketAddress::Ip(SocketAddr::new(IpAddr::V4(ip), remote_destination_1.1));
         let expected = ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
             remote_address: remote_address_1.clone(),
+            flags: ConnectFlags::empty(),
         }));
         let message = match client_msg_rx.recv().await.ok_or(0).unwrap() {
             ClientMessage::Ping => client_msg_rx.recv().await.ok_or(0).unwrap(),
@@ -1178,6 +1180,7 @@ mod test {
 
         let expected = ClientMessage::TcpOutgoing(LayerTcpOutgoing::Connect(LayerConnect {
             remote_address: remote_address_2.clone(),
+            flags: ConnectFlags::empty(),
         }));
         let message = match client_msg_rx.recv().await.ok_or(0).unwrap() {
             ClientMessage::Ping => client_msg_rx.recv().await.ok_or(0).unwrap(),
