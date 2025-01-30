@@ -173,6 +173,12 @@ pub struct IncomingNetworkPolicy {
     pub http_filter: HttpFilterPolicy,
 }
 
+#[derive(PartialEq, Eq, Clone, Debug, JsonSchema, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InnerFilterPolicy {
+    Header { header: String },
+}
+
 /// Http filter policy that allows to specify any filter requirments that users must specify in
 /// their config for a successful network steal
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
@@ -182,6 +188,10 @@ pub struct HttpFilterPolicy {
     /// `steal-without-filter` block to require the user to specify a header filter for network
     /// steal feature)
     pub header_filter: Option<String>,
+
+    pub all_of: Option<Vec<InnerFilterPolicy>>,
+
+    pub any_of: Option<Vec<InnerFilterPolicy>>,
 }
 
 #[test]
