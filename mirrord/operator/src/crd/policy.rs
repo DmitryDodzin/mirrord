@@ -177,6 +177,7 @@ pub struct IncomingNetworkPolicy {
 #[serde(untagged)]
 pub enum InnerFilterPolicy {
     Header { header: String },
+    Path { path: String },
 }
 
 /// Http filter policy that allows to specify any filter requirments that users must specify in
