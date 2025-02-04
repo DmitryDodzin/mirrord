@@ -511,15 +511,6 @@ impl LayerConfig {
             if self.feature.network.incoming.is_steal() {
                 Err(ConfigError::Conflict("Steal mode is not compatible with a targetless agent, please either disable this option or specify a target.".into()))?
             }
-
-            if self.agent.ephemeral {
-                Err(ConfigError::Conflict(
-                    "Using an ephemeral container for the agent is not \
-                         compatible with a targetless agent, please either disable this option or \
-                        specify a target."
-                        .into(),
-                ))?
-            }
         }
 
         if self.feature.copy_target.enabled {

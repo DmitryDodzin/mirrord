@@ -250,7 +250,11 @@ impl KubernetesAPI {
         info!(?params, "Spawning new agent");
 
         let agent_connect_info = match (runtime_data, self.agent.ephemeral) {
-            (None, false) => {
+            (None, ephemeral) => {
+                if ephemeral {
+                    progress.warning("cannot use ephemeral containers with targetless so falling back on job variant");
+                }
+
                 let variant = JobVariant::new(&self.agent, &params);
 
                 Targetless::new(&self.client, &variant)
@@ -271,7 +275,6 @@ impl KubernetesAPI {
                     .create_agent(progress)
                     .await?
             }
-            (None, true) => return Err(KubeApiError::MissingRuntimeData),
         };
 
         info!(?agent_connect_info, "Created agent pod");
