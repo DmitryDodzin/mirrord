@@ -22,7 +22,14 @@ mod targetless_tests {
     #[timeout(Duration::from_secs(30))]
     pub async fn connect_to_kubernetes_api_service_with_targetless_agent() {
         let app = Application::CurlToKubeApi;
-        let mut process = app.run_targetless(None, None, None).await;
+
+        let flags = if cfg!(feature = "ephemeral") {
+            Some(["-e"].to_vec())
+        } else {
+            None
+        };
+
+        let mut process = app.run_targetless(None, flags, None).await;
         let res = process.wait().await;
         assert!(res.success());
         let stdout = process.get_stdout().await;
