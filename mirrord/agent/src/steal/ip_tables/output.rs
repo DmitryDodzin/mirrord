@@ -21,20 +21,14 @@ where
     const ENTRYPOINT: &'static str = "OUTPUT";
 
     #[tracing::instrument(level = tracing::Level::TRACE, skip(ipt), err)]
-    pub fn create(ipt: Arc<IPT>, chain_name: String, pod_ips: Option<&str>) -> AgentResult<Self> {
+    pub fn create(ipt: Arc<IPT>, chain_name: String, _pod_ips: Option<&str>) -> AgentResult<Self> {
         let managed = IPTableChain::create(ipt, chain_name.clone()).inspect_err(
             |e| tracing::error!(%e, "Could not create iptables chain \"{chain_name}\"."),
         )?;
 
-        let exclude_source_ips = pod_ips
-            .map(|pod_ips| format!("! -s {pod_ips}"))
-            .unwrap_or_default();
-
         let gid = getgid();
         managed
-            .add_rule(&format!(
-                "-m owner --gid-owner {gid} -p tcp {exclude_source_ips} -j RETURN"
-            ))
+            .add_rule(&format!("-m owner --gid-owner {gid} -j RETURN"))
             .inspect_err(|_| {
                 warn!("Unable to create iptable rule with \"--gid-owner {gid}\" filter")
             })?;
@@ -83,9 +77,8 @@ where
     }
 
     async fn add_redirect(&self, redirected_port: Port, target_port: Port) -> AgentResult<()> {
-        let redirect_rule = format!(
-            "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
-        );
+        let redirect_rule =
+            format!("-m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
 
         self.managed.add_rule(&redirect_rule)?;
 
@@ -93,9 +86,8 @@ where
     }
 
     async fn remove_redirect(&self, redirected_port: Port, target_port: Port) -> AgentResult<()> {
-        let redirect_rule = format!(
-            "-o lo -m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}"
-        );
+        let redirect_rule =
+            format!("-m tcp -p tcp --dport {redirected_port} -j REDIRECT --to-ports {target_port}");
 
         self.managed.remove_rule(&redirect_rule)?;
 
