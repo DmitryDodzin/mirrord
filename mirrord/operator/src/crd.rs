@@ -754,27 +754,11 @@ impl ActiveSqsSplits {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")] // workload_type -> workloadType
-pub struct ActiveRmqSplits {
-    /// For each queue_id, the actual queue name as retrieved from the target's pod spec or config
-    /// map, together with the name of its temporary output queue.
-    pub queue_names: BTreeMap<QueueId, QueueNameUpdate>,
-
-    /// Names of env vars that contain the queue name directly in the pod template, without config
-    /// map refs, mapped to their queue id.
-    pub direct_env_vars: HashMap<String, QueueId>,
-
-    pub env_updates: BTreeMap<String, QueueNameUpdate>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")] // sqs_details -> sqsDetails
 pub struct WorkloadQueueRegistryStatus {
     /// Optional even though it's currently the only field, because in the future there will be
     /// fields for other queue types.
     pub sqs_details: Option<ActiveSqsSplits>,
-
-    pub rmq_details: Option<ActiveRmqSplits>,
 }
 
 /// Defines a Custom Resource that holds a central configuration for splitting queues for a

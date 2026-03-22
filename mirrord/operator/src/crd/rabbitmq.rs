@@ -1,10 +1,8 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
-    ops::Not,
 };
 
-use amq_protocol_types::FieldTable;
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -14,25 +12,23 @@ use super::{QueueConsumer, QueueId, QueueMessageFilter, QueueNameUpdate, SplitQu
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")] // name_source -> nameSource in yaml.
 pub struct RmqQueueDetails {
-    /// the name of [`MirrordPropertyList`](crate::crd::properties::MirrordPropertyList) that
-    /// contains the RabbitMQ cluster definition.
-    pub cluster_ref: String,
+    /// Name of the `MirrordPropertiesList` that should be used to resolve cluster connection
+    /// options.
+    pub cluster_name: String,
 
     #[serde(flatten)]
     pub name_details: SplitQueueNameDetails,
 
-    #[serde(default, skip_serializing_if = "Not::not")]
-    pub durable: bool,
+    /// Name of the `MirrordPropertiesList` that should be used to resolve queue options.
+    pub queue_properties_list_name: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Not::not")]
-    pub exclusive: bool,
+    /// Where the application gets the queue name from. Will be used to read messages from that
+    /// queue and distribute them to the output queues. When running with mirrord and splitting
+    /// this queue, applications will get a modified name from that source.
+    pub exchange_source: Option<QueueNameSource>,
 
-    #[serde(default, skip_serializing_if = "Not::not")]
-    pub auto_delete: bool,
-
-    /// RabbitMQ specific arguments that will be used during for the cosume call.
-    #[serde(default)]
-    pub arguments: FieldTable,
+    /// Name of the `MirrordPropertiesList` that should be used to resolve queue options.
+    pub exchange_properties_list_name: Option<String>,
 }
 
 impl Eq for RmqQueueDetails {}

@@ -41,7 +41,6 @@ client = [
   "dep:tower",
 ]
 crd = [
-  "dep:amq-protocol-types",
   "dep:base64",
   "dep:k8s-openapi",
   "dep:kube",
@@ -65,7 +64,6 @@ mirrord-progress = { path = "../progress", optional = true }
 mirrord-protocol = { path = "../protocol", optional = true }
 mirrord-protocol-io = { path = "../protocol-io", optional = true}
 
-amq-protocol-types = { version = "10", optional = true }
 base64 = { workspace = true, optional = true }
 bincode = { workspace = true, features = ["serde"], optional = true }
 chrono = { workspace = true, features = ["clock", "serde"] }
