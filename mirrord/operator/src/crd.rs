@@ -640,7 +640,7 @@ impl JsonSchema for SplitQueue {
         #[derive(Serialize, Deserialize, JsonSchema)]
         struct Proxy {
             // We verify the tag.
-            #[serde(rename = "type")]
+            #[serde(rename = "queueType")]
             tag: SplitQueueDiscriminants,
             // Other fields can be whatever.
             //
@@ -958,8 +958,8 @@ mod tests {
     use kube::CustomResourceExt;
 
     use crate::crd::{
-        MirrordClusterOperatorUserCredential, MirrordOperatorCrd, MirrordSqsSession,
-        MirrordWorkloadQueueRegistry, QueueNameSource, SessionCrd, SplitQueue, SqsQueueDetails,
+        MirrordClusterOperatorUserCredential, MirrordSqsSession, MirrordWorkloadQueueRegistry,
+        QueueNameSource, SplitQueue, SplitQueueNameDetails, SqsQueueDetails,
         db_branching::{
             mongodb::MongodbBranchDatabase, mysql::MysqlBranchDatabase, pg::PgBranchDatabase,
         },
@@ -985,7 +985,7 @@ mod tests {
             let path = Path::new(&out_path);
             fs::create_dir_all(path).unwrap();
             let filename = crd.metadata.name.as_ref().unwrap();
-            let filepath = path.join(filename);
+            let filepath = path.join(format!("{filename}.yaml"));
             fs::write(filepath, yaml).unwrap();
         }
     }
@@ -1029,9 +1029,11 @@ mod tests {
         assert_eq!(
             deserialized,
             SplitQueue::Sqs(SqsQueueDetails {
-                name_source: QueueNameSource::EnvVar("TEST_ENV".into()),
-                fallback_name: None,
-                names_from_json_map: None,
+                name_details: SplitQueueNameDetails {
+                    name_source: QueueNameSource::EnvVar("TEST_ENV".into()),
+                    fallback_name: None,
+                    names_from_json_map: None,
+                },
                 tags: None,
                 sns: None,
             }),

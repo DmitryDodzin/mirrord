@@ -20,6 +20,7 @@ workspace = true
 default = []
 client = [
   "crd",
+  "dep:base64",
   "dep:bincode",
   "dep:http",
   "dep:http-body-util",
@@ -41,7 +42,6 @@ client = [
   "dep:tower",
 ]
 crd = [
-  "dep:base64",
   "dep:k8s-openapi",
   "dep:kube",
   "dep:mirrord-agent-env",
