@@ -7,7 +7,10 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{QueueConsumer, QueueId, QueueMessageFilter, QueueNameUpdate, SplitQueueNameDetails};
+use super::{
+    QueueConsumer, QueueId, QueueMessageFilter, QueueNameSource, QueueNameUpdate,
+    SplitQueueNameDetails,
+};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")] // name_source -> nameSource in yaml.
