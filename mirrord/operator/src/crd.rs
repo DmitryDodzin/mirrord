@@ -564,6 +564,10 @@ pub struct SplitQueueNameDetails {
     /// Setting a fallback name only makes sense if the target application indeed uses the defined
     /// queue name source to override the source it uses on its absence.
     pub fallback_name: Option<String>,
+
+    /// If set, the value read from `name_source` or `fallback_name`
+    /// will be parsed as a JSON map. The values in this map will be used as queue names.
+    pub names_from_json_map: Option<bool>,
 }
 
 /// Set where the application reads the name of the queue from, so that mirrord can find that queue,
@@ -588,10 +592,6 @@ pub enum QueueNameSource {
 pub struct SqsQueueDetails {
     #[serde(flatten)]
     pub name_details: SplitQueueNameDetails,
-
-    /// If set, the value read from `name_source` or `fallback_name`
-    /// will be parsed as a JSON map. The values in this map will be used as queue names.
-    pub names_from_json_map: Option<bool>,
 
     /// These tags will be set for all temporary SQS queues created by mirrord for queues defined
     /// in this MirrordWorkloadQueueRegistry, alongside with the original tags of the respective
