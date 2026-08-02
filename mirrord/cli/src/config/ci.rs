@@ -4,37 +4,38 @@ use clap::{Args, Subcommand, ValueHint};
 
 use crate::{ContainerArgs, ExecArgs};
 
-/// `mirrord ci` commands.
+/// `mirrord ci` and `mirrord cloud-agent` commands.
 #[derive(Subcommand, Debug)]
 pub(crate) enum CiCommand {
-    /// Generates a `CiApiKey` that should be set in the ci's environment variable as
-    /// `MIRRORD_CI_API_KEY`.
+    /// Generates a machine token that should be set in the environment variable
+    /// `MIRRORD_MACHINE_TOKEN`.
     ApiKey {
         /// Specify config file to use
         #[arg(short = 'f', long, value_hint = ValueHint::FilePath, default_missing_value = "./.mirrord/mirrord.json", num_args = 0..=1)]
         config_file: Option<PathBuf>,
     },
 
-    /// Starts mirrord for ci. Takes the same arguments as `mirrord exec` plus ci specific options.
+    /// Starts a machine session. Takes the same arguments as `mirrord exec` plus machine session
+    /// specific options.
     ///
-    /// - The environment variable `MIRRORD_CI_API_KEY` must be set for this command to work.
+    /// - The environment variable `MIRRORD_MACHINE_TOKEN` must be set for this command to work.
     Start(Box<CiStartArgs>),
 
-    /// Stops mirrord for ci.
+    /// Stops a machine session.
     ///
-    /// - The environment variable `MIRRORD_CI_API_KEY` must be set for this command to work.
+    /// - The environment variable `MIRRORD_MACHINE_TOKEN` must be set for this command to work.
     Stop,
 
-    /// Starts mirrord for ci inside a container. Takes the same arguments as `mirrord container`,
-    /// plus ci specific options.
+    /// Starts a machine session inside a container. Takes the same arguments as `mirrord
+    /// container`, plus machine session specific options.
     ///
-    /// - The environment variable `MIRRORD_CI_API_KEY` must be set for this command to work.
+    /// - The environment variable `MIRRORD_MACHINE_TOKEN` must be set for this command to work.
     Container(Box<CiContainerArgs>),
 }
 
 #[derive(Args, Debug)]
 pub(crate) struct CiArgs {
-    /// Command to use with `mirrord ci`.
+    /// Command to use with `mirrord ci` / `mirrord cloud-agent`.
     #[command(subcommand)]
     pub command: CiCommand,
 }

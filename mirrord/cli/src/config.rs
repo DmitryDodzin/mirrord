@@ -201,8 +201,12 @@ pub(super) enum Commands {
     /// Subscribe to the mirrord newsletter.
     Newsletter,
 
-    /// Execute a command related to mirrord CI.
+    /// Execute a command related to mirrord CI or cloud agents.
+    ///
+    /// Both run as machine sessions, authenticated with a machine token instead of a developer
+    /// seat, so they share the same commands under the `cloud-agent` alias.
     #[cfg_attr(target_os = "windows", command(hide = true))]
+    #[command(alias = "cloud-agent")]
     Ci(Box<CiArgs>),
 
     /// Manage preview environments (requires operator).

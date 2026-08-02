@@ -14,8 +14,8 @@ pub(crate) enum CiError {
         "The required environment variable {0} was not found or contains an invalid character!"
     )]
     #[diagnostic(help(
-        "`mirrord ci start` and `mirrord ci stop` require the environment variable `{0}` to be set, \
-         please add the missing env var before trying to run the `mirrord ci` command again."
+        "`mirrord ci`/`mirrord cloud-agent` commands require the environment variable `{0}` to be \
+         set, please add the missing env var before trying to run the command again."
     ))]
     EnvVar(&'static str, std::env::VarError),
 
@@ -26,11 +26,12 @@ pub(crate) enum CiError {
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
 
-    #[error("`MIRRORD_CI_API_KEY` env var is missing!")]
+    #[error("`MIRRORD_MACHINE_TOKEN` env var is missing!")]
     #[diagnostic(help(
-        "`mirrord ci start` requires this env var when running with the mirrord operator to avoid \
-        creating invalid credentials. \
-        Please add this env var with the value received from `mirrord ci api-key`."
+        "`mirrord ci start` and `mirrord cloud-agent start` require a machine token when running \
+        with the mirrord operator to avoid creating invalid credentials. \
+        Please add this env var with the value received from `mirrord ci api-key`. \
+        The former name of this env var, `MIRRORD_CI_API_KEY`, is still accepted."
     ))]
     MissingCiApiKey,
 

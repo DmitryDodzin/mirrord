@@ -17,7 +17,7 @@ use mirrord_analytics::{AnalyticsHash, AnalyticsOperatorProperties, Reporter};
 use mirrord_auth::{
     certificate::Certificate,
     credential_store::{CredentialStoreSync, UserIdentity},
-    credentials::{CiApiKey, Credentials, LicenseValidity},
+    credentials::{Credentials, LicenseValidity, MachineToken},
 };
 use mirrord_config::{
     LayerConfig,
@@ -323,7 +323,7 @@ impl OperatorApi<NoClientCert> {
         reporter: &mut R,
         progress: &P,
         layer_config: &LayerConfig,
-        ci_api_key: &CiApiKey,
+        ci_api_key: &MachineToken,
     ) -> OperatorApi<MaybeClientCert>
     where
         R: Reporter,
@@ -561,7 +561,7 @@ where
             ))
         })?;
 
-        let api_key = CiApiKey::V1(credentials);
+        let api_key = MachineToken::V1(credentials);
 
         let encoded = api_key.encode_as_url_safe_string().map_err(|error| {
             OperatorApiError::ClientCertError(format!("failed to encode api key: {error}"))

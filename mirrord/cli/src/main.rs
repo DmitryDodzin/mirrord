@@ -42,8 +42,8 @@
 //! and finally run the user binary with the mirrord lib loaded, but this time we use `execve`,
 //! instead of [`tokio::process::Command`].
 //!
-//! - When the env var `MIRRORD_CI_API_KEY` is set, `exec` actually becomes `mirrord ci start
-//!   --foreground`.
+//! - When a machine token env var (`MIRRORD_MACHINE_TOKEN`, or the older `MIRRORD_CI_API_KEY`) is
+//!   set, `exec` actually becomes `mirrord ci start --foreground`.
 //!
 //! #### operator vs no operator `exec`
 //!
@@ -339,6 +339,7 @@ mod kube;
 mod list;
 mod local_redis;
 mod logging;
+mod machine_token;
 mod newsletter;
 mod operator;
 #[cfg(windows)]
@@ -1062,10 +1063,11 @@ fn main() -> miette::Result<()> {
             Commands::Exec(args) => {
                 if ci_api_key_available()?.is_some() {
                     let mut progress = ProgressTracker::from_env("mirrord exec");
-                    progress.warning("Detected `mirrord exec` running with a CI token.");
+                    progress.warning("Detected `mirrord exec` running with a machine token.");
                     progress.info(
-                        "This run is being handled as a mirrord CI session. \
+                        "This run is being handled as a mirrord machine session. \
                         For future compatibility, please migrate to: `mirrord ci start` \
+                        (or `mirrord cloud-agent start`) \
                         More details can be found here: \
                         https://metalbear.com/mirrord/docs/using-mirrord/mirrord-for-ci",
                     );

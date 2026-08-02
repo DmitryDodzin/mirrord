@@ -1,7 +1,7 @@
 #![cfg_attr(windows, allow(unused))]
 use std::{
     collections::{HashMap, HashSet},
-    env::{self, temp_dir},
+    env::temp_dir,
     path::{Path, PathBuf},
 };
 #[cfg(not(target_os = "windows"))]
@@ -11,7 +11,7 @@ use ci_info::types::CiInfo;
 use drain::Watch;
 use fs4::tokio::AsyncFileExt;
 use mirrord_analytics::NullReporter;
-use mirrord_auth::credentials::CiApiKey;
+use mirrord_auth::credentials::MachineToken;
 use mirrord_config::{
     LayerConfig, ci::CiConfig, config::ConfigContext, container::ContainerRuntime,
 };
@@ -25,29 +25,26 @@ use tokio::fs::create_dir_all;
 use tokio::{fs, io::AsyncWriteExt};
 use tracing::Level;
 
-use crate::{CliError, CliResult, ci::error::CiError, config::ci::*, user_data::UserData};
+use crate::{
+    CliError, CliResult,
+    ci::error::CiError,
+    config::ci::*,
+    machine_token::{MIRRORD_MACHINE_TOKEN, machine_token_from},
+    user_data::UserData,
+};
 
 pub(crate) mod container;
 pub(crate) mod error;
 pub(super) mod start;
 pub(crate) mod stop;
 
-/// Env var that the user has to set in order to execute `mirrord ci start` and `mirrord ci stop`
-/// commands when the operator is available.
-///
-/// Should be set in their CI to the value they got from [`generate_ci_api_key`].
-const MIRRORD_CI_API_KEY: &str = "MIRRORD_CI_API_KEY";
-
 /// Alias for mirrord-for-ci results.
 type CiResult<T> = Result<T, crate::ci::error::CiError>;
 
-/// Try to load and decode the [`MIRRORD_CI_API_KEY`] env var.
-pub(crate) fn ci_api_key_available() -> CiResult<Option<CiApiKey>> {
-    match std::env::var(MIRRORD_CI_API_KEY) {
-        Ok(api_key) => Ok(Some(CiApiKey::decode(&api_key)?)),
-        Err(env::VarError::NotPresent) => Ok(None),
-        Err(fail @ env::VarError::NotUnicode(..)) => Err(CiError::EnvVar(MIRRORD_CI_API_KEY, fail)),
-    }
+/// Try to load and decode the machine token from the first of [`MACHINE_TOKEN_ENV_VARS`] that is
+/// set.
+pub(crate) fn ci_api_key_available() -> CiResult<Option<MachineToken>> {
+    machine_token_from(std::env::var)
 }
 
 /// Handle commands related to CI `mirrord ci ...`
@@ -76,7 +73,7 @@ pub(crate) async fn ci_command(
     }
 }
 
-/// Generate a new API key for CI usage by calling the operator API:
+/// Generate a new machine token for CI and cloud agent usage by calling the operator API:
 /// `POST /mirrordclusteroperatorusercredentials`
 #[tracing::instrument(level = Level::TRACE, ret)]
 async fn generate_ci_api_key(config_file: Option<PathBuf>) -> CliResult<()> {
@@ -105,11 +102,11 @@ async fn generate_ci_api_key(config_file: Option<PathBuf>) -> CliResult<()> {
             subtask.failure(Some(&format!("failed to create API key: {error}")));
         })?;
     subtask.success(Some(&format!(
-        r#"mirrord CI API key:
+        r#"mirrord machine token:
 {api_key}
 
-Please store this securely! To use it in your CI/CD system, set it as the value of the
-MIRRORD_CI_API_KEY environment variable.
+Please store this securely! To use it in your CI/CD system or cloud agent, set it as the value
+of the {MIRRORD_MACHINE_TOKEN} environment variable.
 "#
     )));
 
@@ -220,7 +217,7 @@ impl MirrordCiStore {
 #[derive(Debug)]
 pub(super) struct MirrordCi {
     /// Used as the `Credentials` (certificate) for the `mirrord ci` operations.
-    ci_api_key: Option<CiApiKey>,
+    ci_api_key: Option<MachineToken>,
 
     /// Arguments for the mirrord for CI operations that involve starting something:
     /// - `mirrord ci start`
@@ -262,7 +259,7 @@ impl MirrordCi {
     }
 
     /// Helper to access the [`CiApiKey`] when preparing the kube request headers.
-    pub(super) fn api_key(&self) -> Option<&CiApiKey> {
+    pub(super) fn api_key(&self) -> Option<&MachineToken> {
         self.ci_api_key.as_ref()
     }
 
@@ -499,8 +496,8 @@ impl MirrordCi {
         unimplemented!("Not supported on windows.");
     }
 
-    /// Reads the [`MirrordCiStore`], and the env var [`MIRRORD_CI_API_KEY`] to return a valid
-    /// [`MirrordCi`].
+    /// Reads the [`MirrordCiStore`], and the machine token env var (see
+    /// [`MACHINE_TOKEN_ENV_VARS`]) to return a valid [`MirrordCi`].
     #[tracing::instrument(level = Level::TRACE, ret, err)]
     pub(super) async fn new(ci_common_args: CiCommonArgs) -> CiResult<Self> {
         MirrordCiStore::read_from_file_or_default().await?;
@@ -534,5 +531,70 @@ impl MirrordCi {
 
     pub(super) fn is_foreground(&self) -> bool {
         self.ci_common_args.foreground
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+    use crate::machine_token::MIRRORD_CI_API_KEY;
+
+    /// Decoding a well-formed token is covered by `mirrord_auth`'s own tests, so these cases only
+    /// pin down what [`machine_token_from`] itself decides: which env var is consulted, in what
+    /// order, and when we stop.
+    #[test]
+    fn no_machine_token_env_var_set() {
+        let mut queried = Vec::new();
+        let result = machine_token_from(|env_var| {
+            queried.push(env_var);
+            Err(env::VarError::NotPresent)
+        });
+
+        assert!(matches!(result, Ok(None)));
+        assert_eq!(queried, [MIRRORD_MACHINE_TOKEN, MIRRORD_CI_API_KEY]);
+    }
+
+    /// [`MIRRORD_CI_API_KEY`] is not even read when [`MIRRORD_MACHINE_TOKEN`] is set, so a stale
+    /// CI key left over in the environment cannot shadow the token the user just configured.
+    #[test]
+    fn machine_token_takes_precedence_over_ci_api_key() {
+        let mut queried = Vec::new();
+        let result = machine_token_from(|env_var| {
+            queried.push(env_var);
+            Ok("not-a-real-token".to_owned())
+        });
+
+        assert!(matches!(result, Err(CiError::CiApiKey(..))));
+        assert_eq!(queried, [MIRRORD_MACHINE_TOKEN]);
+    }
+
+    /// Existing CI setups that only set the old env var keep working.
+    #[test]
+    fn falls_back_to_ci_api_key() {
+        let mut queried = Vec::new();
+        let result = machine_token_from(|env_var| {
+            queried.push(env_var);
+            (env_var == MIRRORD_CI_API_KEY)
+                .then(|| "not-a-real-token".to_owned())
+                .ok_or(env::VarError::NotPresent)
+        });
+
+        assert!(matches!(result, Err(CiError::CiApiKey(..))));
+        assert_eq!(queried, [MIRRORD_MACHINE_TOKEN, MIRRORD_CI_API_KEY]);
+    }
+
+    /// A malformed token must fail loudly instead of falling through to the next env var, which
+    /// would quietly run the session against a developer seat.
+    #[test]
+    fn malformed_machine_token_does_not_fall_back() {
+        let result = machine_token_from(|env_var| {
+            (env_var == MIRRORD_MACHINE_TOKEN)
+                .then(|| "not-a-real-token".to_owned())
+                .ok_or(env::VarError::NotPresent)
+        });
+
+        assert!(matches!(result, Err(CiError::CiApiKey(..))));
     }
 }
